@@ -12,6 +12,7 @@ pipeline {
         stage('Compile Code') {
             steps {
                 echo 'Compiling the application...'
+		sh 'chmod +x ./gradlew'
                 sh './gradlew compileJava'
             }
         }
