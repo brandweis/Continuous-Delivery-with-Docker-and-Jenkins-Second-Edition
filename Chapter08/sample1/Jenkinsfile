@@ -1,67 +1,142 @@
 pipeline {
-    agent any  
+     agent any
 
-    stages {
-        stage('Checkout Code') {
-            steps {
-                echo "Checking out code from branch: ${env.BRANCH_NAME}"
-                checkout scm
-            }
-        }
+     environment {
+         BUILD_TIMESTAMP = "${new Date().format('yyyyMMddHHmmss')}"
+     }
 
-        stage('Compile Code') {
-            steps {
-                echo 'Compiling the application...'
-		sh 'cd Chapter08/sample1 && chmod +x ./gradlew'
-                sh 'cd Chapter08/sample1 && ./gradlew compileJava'
-            }
-        }
+     triggers {
+          pollSCM('H/2 * * * *')
+     }
 
-        stage('Unit Tests') {
-            steps {
-                echo 'Running unit tests...'
-                sh 'cd Chapter08/sample1 && ./gradlew test'
-            }
-        }
+     stages {
+          stage("Checkout") {
+	      steps {
+		  git branch: 'master', credentialsId: 'github-creds', url: 'https://github.com/brandweis/Continuous-Delivery-with-Docker-and-Jenkins-Second-Edition.git'
+	      }
+	  }
 
-        stage('Static Code Analysis') {
-            steps {
-                echo 'Performing static code analysis...'
-                sh 'cd Chapter08/sample1 && ./gradlew checkstyleMain'
-            }
-        }
+	  stage("Install Java") {
+	      steps {
+		  sh """
+		  sudo apt-get update && sudo apt-get install -y openjdk-17-jdk
+	 	  export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+		  export PATH=\$JAVA_HOME/bin:\$PATH
+		  java -version
+		  """
+	      }
+	  }
 
-        stage('Code Coverage') {
-            when { branch 'master' }
-            steps {
-                echo 'Running code coverage tests on main branch...'
-                sh 'cd Chapter08/sample1 && ./gradlew jacocoTestReport'
-                sh 'cd Chapter08/sample1 && ./gradlew jacocoTestCoverageVerification'
-            }
-        }
+	  stage("Compile") {
+               steps {
+                   dir('Chapter08/sample1') {
+                       sh "chmod +x gradlew"
+                       sh "./gradlew compileJava"
+                   }
+               }
+          }
 
-        stage('Feature Branch Tests') {
-            when {
-                expression { return env.BRANCH_NAME.contains('feature') }
-            }
-            steps {
-                echo 'Executing all tests except Code Coverage for a feature branch...'
-            }
-        }
+          stage("Unit test") {
+               steps {
+                   dir('Chapter08/sample1') {
+                       sh "./gradlew test"
+                   }
+               }
+          }
 
-        stage('Fail Pipeline') {
-            when {
-                not {
-                    anyOf {
-                        branch 'master'
-                        expression { return env.BRANCH_NAME.contains('feature') }
-                    }
-                }
-            }
-            steps {
-                echo 'This branch is neither main nor a feature branch. Failing the pipeline.'
-                error 'Branch policy violation. Build failed.'
-            }
-        }
-    }
+	  stage("Check if Java Files Changed") {
+	      steps{
+		  script {
+		      def changes = sh(script: "git diff --name-only HEAD~1", returnStdout: true).trim()
+		      if (changes.contains('.java')) {
+			  env.JAVA_FILES_CHANGED = 'true'
+		      } else {
+			  env.JAVA_FILES_CHANGED = 'false'
+		      }
+		  }
+	      }
+	  }
+
+          stage("Code coverage") {
+              when { branch 'master' }  // Code Coverage only runs on master
+	      steps {
+                   dir('Chapter08/sample1') {
+                       sh "./gradlew jacocoTestReport"
+                       sh "./gradlew jacocoTestCoverageVerification"
+                   }
+               }
+          }
+
+          stage("Feature Branch Tests") {
+              when {
+                  expression { return env.BRANCH_NAME.contains('feature') }
+              }
+              steps {
+                  echo 'Executing all tests except Code Coverage for a feature branch...'
+              }
+          }
+
+          stage("Static code analysis") {
+               steps {
+                   dir('Chapter08/sample1') {
+                       sh "./gradlew checkstyleMain"
+                   }
+               }
+          }
+
+          stage("Package") {
+               steps {
+                   dir('Chapter08/sample1') {
+                       sh "./gradlew build"
+                   }
+               }
+          }
+
+          stage("Docker Build") {
+              when {
+                  expression { return env.BRANCH_NAME.contains('feature') }
+              }
+              steps {
+                  dir("Chapter08/sample1") { 
+                      sh "docker build -t branweis/calculator:${BUILD_TIMESTAMP} ."
+                  }
+              }
+          }
+
+          stage("Docker push") {
+              when {
+                  expression { return env.BRANCH_NAME.contains('feature') }
+              }
+              steps {
+                  script {
+                      sh "docker images branweis/calculator:${BUILD_TIMESTAMP}"
+                      sh "docker push branweis/calculator:${BUILD_TIMESTAMP}"
+                  }
+              }
+          }
+
+          stage("Fail Pipeline") {
+              when {
+                  not {
+                      anyOf {
+                          branch 'master'
+                          expression { return env.BRANCH_NAME.contains('feature') }
+                      }
+                  }
+              }
+              steps {
+                  echo 'This branch is neither master nor a feature branch. Failing the pipeline.'
+                  error 'Branch policy violation. Build failed.'
+              }
+          }
+     }
+
+     post {
+         success {
+	     echo "pipeline ran perfectly!"
+         }
+         failure {
+	     echo "pipeline failure"
+         }
+     }
 }
