@@ -20,14 +20,14 @@ pipeline {
         stage('Unit Tests') {
             steps {
                 echo 'Running unit tests...'
-                sh './gradlew test'
+                sh 'cd Chapter08/sample1 && ./gradlew test'
             }
         }
 
         stage('Static Code Analysis') {
             steps {
                 echo 'Performing static code analysis...'
-                sh './gradlew checkstyleMain'
+                sh 'cd Chapter08/sample1 && ./gradlew checkstyleMain'
             }
         }
 
@@ -35,8 +35,8 @@ pipeline {
             when { branch 'main' }
             steps {
                 echo 'Running code coverage tests on main branch...'
-                sh './gradlew jacocoTestReport'
-                sh './gradlew jacocoTestCoverageVerification'
+                sh 'cd Chapter08/sample1 && ./gradlew jacocoTestReport'
+                sh 'cd Chapter08/sample1 && ./gradlew jacocoTestCoverageVerification'
             }
         }
 
