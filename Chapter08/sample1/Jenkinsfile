@@ -1,129 +1,59 @@
 pipeline {
-     agent any
+    agent any
 
-     environment {
-         BUILD_TIMESTAMP = "${new Date().format('yyyyMMddHHmmss')}"
-	 GRADE_OPTS = "-Dorg.gradle.daemon=false"
-     }
+    environment {
+        GRADLE_USER_HOME = "${WORKSPACE}/.gradle"  // Cache Gradle dependencies
+        BUILD_TIMESTAMP = "${new Date().format('yyyyMMddHHmmss')}"
+    }
 
-     stages {
-          stage("Checkout") {
-              steps {
-                  git branch: 'master', credentialsId: 'github-creds', url: 'https://github.com/brandweis/Continuous-Delivery-with-Docker-and-Jenkins-Second-Edition.git'
-              }
-          }
+    stages {
+        stage("Checkout") {
+            steps {
+                git branch: 'gradle-cache', credentialsId: 'github-creds', url: 'https://github.com/brandweis/Continuous-Delivery-with-Docker-and-Jenkins-Second-Edition.git'
+            }
+        }
 
-          stage("Compile") {
-               steps {
-                   dir('Chapter08/sample1') {
-                       sh "chmod +x gradlew"
-                       sh "./gradlew --no-daemon compileJava"
-                   }
-               }
-          }
+        stage("Compile") {
+            steps {
+                dir('Chapter08/sample1') {
+                    sh "chmod +x gradlew"
+                    sh "./gradlew --no-daemon compileJava"
+                }
+            }
+        }
 
-          stage("Unit test") {
-               steps {
-                   dir('Chapter08/sample1') {
-                       sh "./gradlew --no-daemon test"
-                   }
-               }
-          }
+        stage("Unit Test") {
+            steps {
+                dir('Chapter08/sample1') {
+                    sh "./gradlew --no-daemon test"
+                }
+            }
+        }
 
-          stage("Check if Java Files Changed") {
-              steps{
-                  script {
-                      def changes = sh(script: "git diff --name-only HEAD~1", returnStdout: true).trim()
-                      if (changes.contains('.java')) {
-                          env.JAVA_FILES_CHANGED = 'true'
-                      } else {
-                          env.JAVA_FILES_CHANGED = 'false'
-                      }
-                  }
-              }
-          }
+        stage("Static Code Analysis") {
+            steps {
+                dir('Chapter08/sample1') {
+                    sh "./gradlew --no-daemon checkstyleMain"
+                }
+            }
+        }
 
-          stage("Code coverage") {
-              when { branch 'master' }  // Code Coverage only runs on master
-              steps {
-                   dir('Chapter08/sample1') {
-                       sh "./gradlew --no-daemon jacocoTestReport"
-                       sh "./gradlew --no-daemon jacocoTestCoverageVerification"
-                   }
-               }
-          }
+        stage("Package") {
+            steps {
+                dir('Chapter08/sample1') {
+                    sh "./gradlew --no-daemon build"
+                }
+            }
+        }
+    }
 
-          stage("Feature Branch Tests") {
-              when {
-                  expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-              }
-              steps {
-                  echo 'Executing all tests except Code Coverage for a feature branch...'
-              }
-          }
-
-          stage("Static code analysis") {
-               steps {
-                   dir('Chapter08/sample1') {
-                       sh "./gradlew --no-daemon checkstyleMain"
-                   }
-               }
-          }
-
-          stage("Package") {
-               steps {
-                   dir('Chapter08/sample1') {
-                       sh "./gradlew --no-daemon build"
-                   }
-               }
-          }
-
-          stage("Docker Build") {
-              when {
-                  expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-              }
-              steps {
-                  sh "sudo systemctl restart docker || echo 'Docker already running'"
-                  dir("Chapter08/sample1") { 
-                      sh "docker build -t branweis/calculator:${BUILD_TIMESTAMP} ."
-                  }
-              }
-          }
-
-          stage("Docker push") {
-              when {
-                  expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-              }
-              steps {
-                  script {
-                      sh "docker images branweis/calculator:${BUILD_TIMESTAMP}"
-                      sh "docker push branweis/calculator:${BUILD_TIMESTAMP}"
-                  }
-              }
-          }
-
-          stage("Fail Pipeline") {
-              when {
-                  not {
-                      anyOf {
-                          branch 'master'
-                          expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-                      }
-                  }
-              }
-              steps {
-                  echo 'This branch is neither master nor a feature branch. Failing the pipeline.'
-                  error 'Branch policy violation. Build failed.'
-              }
-          }
-     }
-
-     post {
-         success {
-             echo "Pipeline ran perfectly!"
-         }
-         failure {
-             echo "Pipeline failure"
-         }
-     }
+    post {
+        success {
+            echo "Pipeline ran successfully!"
+        }
+        failure {
+            echo "Pipeline failed."
+        }
+    }
 }
+
