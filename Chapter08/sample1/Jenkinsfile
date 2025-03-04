@@ -12,8 +12,8 @@ pipeline {
         stage('Compile Code') {
             steps {
                 echo 'Compiling the application...'
-		sh 'chmod +x ./gradlew'
-                sh './gradlew compileJava'
+		sh 'cd Chapter08/sample1 && chmod +x ./gradlew'
+                sh 'cd Chapter08/sample1 && ./gradlew compileJava'
             }
         }
 
