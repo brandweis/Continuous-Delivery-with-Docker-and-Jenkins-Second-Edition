@@ -3,6 +3,7 @@ pipeline {
 
      environment {
          BUILD_TIMESTAMP = "${new Date().format('yyyyMMddHHmmss')}"
+	 GRADE_OPTS = "-Dorg.gradle.daemon=false"
      }
 
      stages {
@@ -16,7 +17,7 @@ pipeline {
                steps {
                    dir('Chapter08/sample1') {
                        sh "chmod +x gradlew"
-                       sh "./gradlew compileJava"
+                       sh "./gradlew --no-daemon compileJava"
                    }
                }
           }
@@ -24,7 +25,7 @@ pipeline {
           stage("Unit test") {
                steps {
                    dir('Chapter08/sample1') {
-                       sh "./gradlew test"
+                       sh "./gradlew --no-daemon test"
                    }
                }
           }
@@ -46,8 +47,8 @@ pipeline {
               when { branch 'master' }  // Code Coverage only runs on master
               steps {
                    dir('Chapter08/sample1') {
-                       sh "./gradlew jacocoTestReport"
-                       sh "./gradlew jacocoTestCoverageVerification"
+                       sh "./gradlew --no-daemon jacocoTestReport"
+                       sh "./gradlew --no-daemon jacocoTestCoverageVerification"
                    }
                }
           }
@@ -64,7 +65,7 @@ pipeline {
           stage("Static code analysis") {
                steps {
                    dir('Chapter08/sample1') {
-                       sh "./gradlew checkstyleMain"
+                       sh "./gradlew --no-daemon checkstyleMain"
                    }
                }
           }
@@ -72,7 +73,7 @@ pipeline {
           stage("Package") {
                steps {
                    dir('Chapter08/sample1') {
-                       sh "./gradlew build"
+                       sh "./gradlew --no-daemon build"
                    }
                }
           }
