@@ -7,23 +7,25 @@ pipeline {
 
      stages {
           stage("Checkout") {
-	      steps {
-		  git branch: 'master', credentialsId: 'github-creds', url: 'https://github.com/brandweis/Continuous-Delivery-with-Docker-and-Jenkins-Second-Edition.git'
-	      }
-	  }
+              steps {
+                  git branch: 'master', credentialsId: 'github-creds', url: 'https://github.com/brandweis/Continuous-Delivery-with-Docker-and-Jenkins-Second-Edition.git'
+              }
+          }
 
-	  stage("Install Java") {
-	      steps {
-		  sh """
-		  apt-get update && apt-get install -y openjdk-17-jdk
-	 	  export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-		  export PATH=\$JAVA_HOME/bin:\$PATH
-		  java -version
-		  """
-	      }
-	  }
+          stage("Install Java") {
+              steps {
+                  sh """
+                  while sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do sleep 1; done
+                  while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 1; done
+                  apt-get update && apt-get install -y openjdk-17-jdk
+                  export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+                  export PATH=\$JAVA_HOME/bin:\$PATH
+                  java -version
+                  """
+              }
+          }
 
-	  stage("Compile") {
+          stage("Compile") {
                steps {
                    dir('Chapter08/sample1') {
                        sh "chmod +x gradlew"
@@ -40,22 +42,22 @@ pipeline {
                }
           }
 
-	  stage("Check if Java Files Changed") {
-	      steps{
-		  script {
-		      def changes = sh(script: "git diff --name-only HEAD~1", returnStdout: true).trim()
-		      if (changes.contains('.java')) {
-			  env.JAVA_FILES_CHANGED = 'true'
-		      } else {
-			  env.JAVA_FILES_CHANGED = 'false'
-		      }
-		  }
-	      }
-	  }
+          stage("Check if Java Files Changed") {
+              steps{
+                  script {
+                      def changes = sh(script: "git diff --name-only HEAD~1", returnStdout: true).trim()
+                      if (changes.contains('.java')) {
+                          env.JAVA_FILES_CHANGED = 'true'
+                      } else {
+                          env.JAVA_FILES_CHANGED = 'false'
+                      }
+                  }
+              }
+          }
 
           stage("Code coverage") {
               when { branch 'master' }  // Code Coverage only runs on master
-	      steps {
+              steps {
                    dir('Chapter08/sample1') {
                        sh "./gradlew jacocoTestReport"
                        sh "./gradlew jacocoTestCoverageVerification"
@@ -93,6 +95,7 @@ pipeline {
                   expression { return env.BRANCH_NAME.contains('feature') }
               }
               steps {
+                  sh "sudo systemctl restart docker || echo 'Docker already running'"
                   dir("Chapter08/sample1") { 
                       sh "docker build -t branweis/calculator:${BUILD_TIMESTAMP} ."
                   }
@@ -129,10 +132,10 @@ pipeline {
 
      post {
          success {
-	     echo "pipeline ran perfectly!"
+             echo "Pipeline ran perfectly!"
          }
          failure {
-	     echo "pipeline failure"
+             echo "Pipeline failure"
          }
      }
 }
