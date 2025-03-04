@@ -55,7 +55,7 @@ pipeline {
 
           stage("Feature Branch Tests") {
               when {
-                  expression { return env.BRANCH_NAME.contains('feature') }
+                  expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
               }
               steps {
                   echo 'Executing all tests except Code Coverage for a feature branch...'
@@ -80,7 +80,7 @@ pipeline {
 
           stage("Docker Build") {
               when {
-                  expression { return env.BRANCH_NAME.contains('feature') }
+                  expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
               }
               steps {
                   sh "sudo systemctl restart docker || echo 'Docker already running'"
@@ -92,7 +92,7 @@ pipeline {
 
           stage("Docker push") {
               when {
-                  expression { return env.BRANCH_NAME.contains('feature') }
+                  expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
               }
               steps {
                   script {
@@ -107,7 +107,7 @@ pipeline {
                   not {
                       anyOf {
                           branch 'master'
-                          expression { return env.BRANCH_NAME.contains('feature') }
+                          expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
                       }
                   }
               }
