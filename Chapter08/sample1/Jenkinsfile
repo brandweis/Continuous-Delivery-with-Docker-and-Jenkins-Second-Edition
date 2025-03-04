@@ -32,7 +32,7 @@ pipeline {
         }
 
         stage('Code Coverage') {
-            when { branch 'main' }
+            when { branch 'master' }
             steps {
                 echo 'Running code coverage tests on main branch...'
                 sh 'cd Chapter08/sample1 && ./gradlew jacocoTestReport'
@@ -53,7 +53,7 @@ pipeline {
             when {
                 not {
                     anyOf {
-                        branch 'main'
+                        branch 'master'
                         expression { return env.BRANCH_NAME.contains('feature') }
                     }
                 }
