@@ -63,6 +63,9 @@ pipeline {
 
         stage("JaCoCo Report") {
             steps {
+		dir('Chapter08/sample1') {
+		    sh "./gradlew --no-daemon jacocoTestReport"
+		}
                 script {
                     publishHTML (target: [
                         reportDir: "${JACOCO_REPORT_DIR}",
