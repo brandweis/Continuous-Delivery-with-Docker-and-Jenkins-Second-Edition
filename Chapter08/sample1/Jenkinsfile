@@ -56,6 +56,7 @@ pipeline {
             steps {
                 dir('Chapter08/sample1') {
                     sh "./gradlew --no-daemon jacocoTestReport"
+		    sh "./gradlew --no-daemon jacocoTestCoverageVerification"
                 }
             }
         }
