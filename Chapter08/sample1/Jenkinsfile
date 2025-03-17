@@ -1,129 +1,113 @@
 pipeline {
-     agent any
+    agent any
 
-     environment {
-         BUILD_TIMESTAMP = "${new Date().format('yyyyMMddHHmmss')}"
-	 GRADE_OPTS = "-Dorg.gradle.daemon=false"
-     }
+    environment {
+        BUILD_TIMESTAMP = "${new Date().format('yyyyMMddHHmmss')}"
+        GRADE_OPTS = "-Dorg.gradle.daemon=false"
+        JACOCO_REPORT_DIR = "Chapter08/sample1/build/reports/jacoco/test/html"
+    }
 
-     stages {
-          stage("Checkout") {
-              steps {
-                  git branch: 'master', credentialsId: 'github-creds', url: 'https://github.com/brandweis/Continuous-Delivery-with-Docker-and-Jenkins-Second-Edition.git'
-              }
-          }
+    triggers {
+        issueCommentTrigger('.*test this please.*') // Optional: Manual trigger via PR comment
+    }
 
-          stage("Compile") {
-               steps {
-                   dir('Chapter08/sample1') {
-                       sh "chmod +x gradlew"
-                       sh "./gradlew --no-daemon compileJava"
-                   }
-               }
-          }
+    stages {
+        stage("Checkout") {
+            steps {
+                checkout scm
+            }
+        }
 
-          stage("Unit test") {
-               steps {
-                   dir('Chapter08/sample1') {
-                       sh "./gradlew --no-daemon test"
-                   }
-               }
-          }
+        stage("Compile") {
+            steps {
+                dir('Chapter08/sample1') {
+                    sh "chmod +x gradlew"
+                    sh "./gradlew --no-daemon compileJava"
+                }
+            }
+        }
 
-          stage("Check if Java Files Changed") {
-              steps{
-                  script {
-                      def changes = sh(script: "git diff --name-only HEAD~1", returnStdout: true).trim()
-                      if (changes.contains('.java')) {
-                          env.JAVA_FILES_CHANGED = 'true'
-                      } else {
-                          env.JAVA_FILES_CHANGED = 'false'
-                      }
-                  }
-              }
-          }
+        stage("Unit Test") {
+            when {
+                not { branch 'main' }
+            }
+            steps {
+                dir('Chapter08/sample1') {
+                    sh "./gradlew --no-daemon test"
+                }
+            }
+        }
 
-          stage("Code coverage") {
-              when { branch 'master' }  // Code Coverage only runs on master
-              steps {
-                   dir('Chapter08/sample1') {
-                       sh "./gradlew --no-daemon jacocoTestReport"
-                       sh "./gradlew --no-daemon jacocoTestCoverageVerification"
-                   }
-               }
-          }
+        stage("Integration Test") {
+            when {
+                not { branch 'main' }
+            }
+            steps {
+                dir('Chapter08/sample1') {
+                    sh "./gradlew --no-daemon integrationTest"
+                }
+            }
+        }
 
-          stage("Feature Branch Tests") {
-              when {
-                  expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-              }
-              steps {
-                  echo 'Executing all tests except Code Coverage for a feature branch...'
-              }
-          }
+        stage("Static Code Analysis") {
+            when {
+                not { branch 'main' }
+            }
+            steps {
+                dir('Chapter08/sample1') {
+                    sh "./gradlew --no-daemon checkstyleMain"
+                }
+            }
+        }
 
-          stage("Static code analysis") {
-               steps {
-                   dir('Chapter08/sample1') {
-                       sh "./gradlew --no-daemon checkstyleMain"
-                   }
-               }
-          }
+        stage("Code Coverage") {
+            when {
+                branch 'main'
+            }
+            steps {
+                dir('Chapter08/sample1') {
+                    sh "./gradlew --no-daemon jacocoTestReport"
+                }
+            }
+        }
 
-          stage("Package") {
-               steps {
-                   dir('Chapter08/sample1') {
-                       sh "./gradlew --no-daemon build"
-                   }
-               }
-          }
+        stage("JaCoCo Report") {
+            steps {
+                script {
+                    publishHTML (target: [
+                        reportDir: "${JACOCO_REPORT_DIR}",
+                        reportFiles: 'index.html',
+                        reportName: "JaCoCo Coverage Report"
+                    ])
+                }
+            }
+        }
 
-          stage("Docker Build") {
-              when {
-                  expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-              }
-              steps {
-                  sh "sudo systemctl restart docker || echo 'Docker already running'"
-                  dir("Chapter08/sample1") { 
-                      sh "docker build -t branweis/calculator:${BUILD_TIMESTAMP} ."
-                  }
-              }
-          }
+        stage("Docker Build & Push") {
+            when {
+                expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
+            }
+            steps {
+                sh "sudo systemctl restart docker || echo 'Docker already running'"
+                dir("Chapter08/sample1") { 
+                    sh "docker build -t branweis/calculator:${BUILD_TIMESTAMP} ."
+                    sh "docker push branweis/calculator:${BUILD_TIMESTAMP}"
+                }
+            }
+        }
+    }
 
-          stage("Docker push") {
-              when {
-                  expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-              }
-              steps {
-                  script {
-                      sh "docker images branweis/calculator:${BUILD_TIMESTAMP}"
-                      sh "docker push branweis/calculator:${BUILD_TIMESTAMP}"
-                  }
-              }
-          }
-
-          stage("Fail Pipeline") {
-              when {
-                  not {
-                      anyOf {
-                          branch 'master'
-                          expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-                      }
-                  }
-              }
-              steps {
-                  echo 'This branch is neither master nor a feature branch. Failing the pipeline.'
-                  error 'Branch policy violation. Build failed.'
-              }
-          }
-     }
-
-     post {
-         success {
-             echo "Pipeline ran perfectly!"
-         }
-         failure {
-             echo "Pipeline failure"
-         }
-     }
+    post {
+        always {
+            script {
+                def testResult = currentBuild.result ?: 'SUCCESS'
+                if (testResult == 'FAILURE') {
+                    echo "tests fail!"
+                } else {
+                    echo "tests pass!"
+                }
+            }
+        }
+    }
 }
+
