@@ -8,7 +8,7 @@ pipeline {
     }
 
     triggers {
-        issueCommentTrigger('.*test this please.*') // Optional: Manual trigger via PR comment
+        githubPush()
     }
 
     stages {
