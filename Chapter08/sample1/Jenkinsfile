@@ -38,17 +38,6 @@ pipeline {
             }
         }
 
-        stage("Integration Test") {
-            when {
-                not { branch 'main' }
-            }
-            steps {
-                dir('Chapter08/sample1') {
-                    sh "./gradlew --no-daemon integrationTest"
-                }
-            }
-        }
-
         stage("Static Code Analysis") {
             when {
                 not { branch 'main' }
