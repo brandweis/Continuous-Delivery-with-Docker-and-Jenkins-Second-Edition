@@ -95,6 +95,33 @@ pipeline {
                 }
             }
         }
+
+        stage("Docker push") {
+            when {
+                expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
+            }
+            steps {
+                script {
+                    sh "docker images branweis/calculator:${BUILD_TIMESTAMP}"
+                    sh "docker push branweis/calculator:${BUILD_TIMESTAMP}"
+                }
+            }
+        }
+
+        stage("Fail Pipeline") {
+            when {
+                not {
+                    anyOf {
+                        branch 'master'
+                        expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
+                    }
+                }
+            }
+            steps {
+                echo 'This branch is neither master nor a feature branch. Failing the pipeline.'
+                error 'Branch policy violation. Build failed.'
+            }
+        }
     }
 
     post {
@@ -108,43 +135,12 @@ pipeline {
                 }
             }
         }
+        success {
+            echo "Pipeline ran perfectly!"
+        }
+        failure {
+            echo "Pipeline failure."
+        }
     }
-
-          stage("Docker push") {
-              when {
-                  expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-              }
-              steps {
-                  script {
-                      sh "docker images branweis/calculator:${BUILD_TIMESTAMP}"
-                      sh "docker push branweis/calculator:${BUILD_TIMESTAMP}"
-                  }
-              }
-          }
-
-          stage("Fail Pipeline") {
-              when {
-                  not {
-                      anyOf {
-                          branch 'master'
-                          expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-                      }
-                  }
-              }
-              steps {
-                  echo 'This branch is neither master nor a feature branch. Failing the pipeline.'
-                  error 'Branch policy violation. Build failed.'
-              }
-          }
-     }
-
-     post {
-         success {
-             echo "Pipeline ran perfectly!"
-         }
-         failure {
-             echo "Pipeline failure."
-         }
-     }
 }
 
