@@ -49,6 +49,18 @@ task smokeTest(type: Test) {
 }
 
 test {
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    reports {
+        xml.enabled true
+        csv.enabled false
+        html.enabled true
+    }
+}
+
+test {
 	exclude '**/acceptance/**'
 	exclude '**/smoke/**'
 }
