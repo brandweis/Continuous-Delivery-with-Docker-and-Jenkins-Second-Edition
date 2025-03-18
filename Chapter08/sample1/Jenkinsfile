@@ -86,7 +86,11 @@ pipeline {
                 expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
             }
             steps {
-                sh "sudo systemctl restart docker || echo 'Docker already running'"
+		script {
+		    withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+			sh "echo '${DOCKER_PASS}' | docker login -u '${DOCKER_USER}' --password-stdin"
+		    }
+		}
                 dir("Chapter08/sample1") { 
                     sh "docker build -t branweis/calculator:${BUILD_TIMESTAMP} ."
                     sh "docker push branweis/calculator:${BUILD_TIMESTAMP}"
