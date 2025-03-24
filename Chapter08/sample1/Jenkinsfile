@@ -1,77 +1,55 @@
-pipeline {
-  agent any
-
-  environment {
-    REGISTRY   = 'localhost:5001'
-    IMAGE_NAME = getImageName()
-    IMAGE_TAG  = getImageTag()
-  }
-
-  stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
-    }
-
-    stage('Build') {
-      steps {
-        sh './gradlew clean build'
-      }
-    }
-
-    stage('Unit Tests') {
-      when {
-        anyOf {
-          branch 'master'
-          branch 'feature'
-          branch 'playground'
-        }
-      }
-      steps {
-        sh './gradlew test'
-      }
-    }
-
-    stage('Code Coverage') {
-      when {
-        branch 'master'
-      }
-      steps {
-        sh './gradlew jacocoTestReport jacocoTestCoverageVerification'
-      }
-    }
-
-    stage('Build and Push Docker Image') {
-      when {
-        allOf {
-          not { branch 'playground' }
-          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
-        }
-      }
-      steps {
-        script {
-          def fullImage = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-          sh """
-            docker build -t ${fullImage} .
-            echo testpassword | docker login https://${REGISTRY} -u testuser --password-stdin
-            docker push ${fullImage}
-          """
-        }
-      }
+stage('Build') {
+  steps {
+    dir('Chapter08/sample1') {
+      sh './gradlew clean build'
     }
   }
 }
 
-def getImageName() {
-  if (env.BRANCH_NAME == 'master') return 'calculator'
-  if (env.BRANCH_NAME == 'feature') return 'calculator-feature'
-  return 'skip'
+stage('Unit Tests') {
+  when {
+    anyOf {
+      branch 'master'
+      branch 'feature'
+      branch 'playground'
+    }
+  }
+  steps {
+    dir('Chapter08/sample1') {
+      sh './gradlew test'
+    }
+  }
 }
 
-def getImageTag() {
-  if (env.BRANCH_NAME == 'master') return '1.0'
-  if (env.BRANCH_NAME == 'feature') return '0.1'
-  return 'skip'
+stage('Code Coverage') {
+  when {
+    branch 'master'
+  }
+  steps {
+    dir('Chapter08/sample1') {
+      sh './gradlew jacocoTestReport jacocoTestCoverageVerification'
+    }
+  }
+}
+
+stage('Build and Push Docker Image') {
+  when {
+    allOf {
+      not { branch 'playground' }
+      expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+    }
+  }
+  steps {
+    dir('Chapter08/sample1') {
+      script {
+        def fullImage = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+        sh """
+          docker build -t ${fullImage} .
+          echo testpassword | docker login https://${REGISTRY} -u testuser --password-stdin
+          docker push ${fullImage}
+        """
+      }
+    }
+  }
 }
 
