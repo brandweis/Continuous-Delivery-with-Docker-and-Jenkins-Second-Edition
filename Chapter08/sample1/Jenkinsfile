@@ -1,148 +1,77 @@
 pipeline {
-    agent any
+  agent any
 
-    environment {
-        BUILD_TIMESTAMP = "${new Date().format('yyyyMMddHHmmss')}"
-        GRADE_OPTS = "-Dorg.gradle.daemon=false"
-        JACOCO_REPORT_DIR = "Chapter08/sample1/build/reports/jacoco/test/html"
+  environment {
+    REGISTRY   = 'localhost:5001'
+    IMAGE_NAME = getImageName()
+    IMAGE_TAG  = getImageTag()
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
 
-    triggers {
-        githubPush()
+    stage('Build') {
+      steps {
+        sh './gradlew clean build'
+      }
     }
 
-    stages {
-        stage("Checkout") {
-            steps {
-                checkout scm
-            }
+    stage('Unit Tests') {
+      when {
+        anyOf {
+          branch 'master'
+          branch 'feature'
+          branch 'playground'
         }
-
-        stage("Compile") {
-            steps {
-                dir('Chapter08/sample1') {
-                    sh "chmod +x gradlew"
-                    sh "./gradlew --no-daemon compileJava"
-                }
-            }
-        }
-
-        stage("Unit Test") {
-            when {
-                not { branch 'main' }
-            }
-            steps {
-                dir('Chapter08/sample1') {
-                    sh "./gradlew --no-daemon test"
-                }
-            }
-        }
-
-        stage("Static Code Analysis") {
-            when {
-                not { branch 'main' }
-            }
-            steps {
-                dir('Chapter08/sample1') {
-                    sh "./gradlew --no-daemon checkstyleMain"
-                }
-            }
-        }
-
-        stage("Code Coverage") {
-            when {
-                branch 'main'
-            }
-            steps {
-                dir('Chapter08/sample1') {
-                    sh "./gradlew --no-daemon jacocoTestReport"
-		    sh "./gradlew --no-daemon jacocoTestCoverageVerification"
-                }
-            }
-        }
-
-        stage("JaCoCo Report") {
-            steps {
-                script {
-                    publishHTML (target: [
-                        reportDir: "${JACOCO_REPORT_DIR}",
-                        reportFiles: 'index.html',
-                        reportName: "JaCoCo Coverage Report"
-                    ])
-                }
-            }
-        }
-
-	stage("Build Jar") {
-	    steps {
-        	dir('Chapter08/sample1') {
-            	    sh "./gradlew --no-daemon clean build"
-        	}
-    	    }
-	}
-
-        stage("Docker Build & Push") {
-            when {
-                expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-            }
-            steps {
-		script {
-		    withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-			sh "echo '${DOCKER_PASS}' | docker login -u '${DOCKER_USER}' --password-stdin"
-		    }
-		}
-                dir("Chapter08/sample1") { 
-                    sh "docker build -t branweis/calculator:${BUILD_TIMESTAMP} ."
-                    sh "docker push branweis/calculator:${BUILD_TIMESTAMP}"
-                }
-            }
-        }
-
-        stage("Docker push") {
-            when {
-                expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-            }
-            steps {
-                script {
-                    sh "docker images branweis/calculator:${BUILD_TIMESTAMP}"
-                    sh "docker push branweis/calculator:${BUILD_TIMESTAMP}"
-                }
-            }
-        }
-
-        stage("Fail Pipeline") {
-            when {
-                not {
-                    anyOf {
-                        branch 'master'
-                        expression { return env.BRANCH_NAME.contains('feature') || env.BRANCH_NAME.startsWith('PR-') }
-                    }
-                }
-            }
-            steps {
-                echo 'This branch is neither master nor a feature branch. Failing the pipeline.'
-                error 'Branch policy violation. Build failed.'
-            }
-        }
+      }
+      steps {
+        sh './gradlew test'
+      }
     }
 
-    post {
-        always {
-            script {
-                def testResult = currentBuild.result ?: 'SUCCESS'
-                if (testResult == 'FAILURE') {
-                    echo "tests fail!"
-                } else {
-                    echo "tests pass!"
-                }
-            }
-        }
-        success {
-            echo "Pipeline ran perfectly!"
-        }
-        failure {
-            echo "Pipeline failure."
-        }
+    stage('Code Coverage') {
+      when {
+        branch 'master'
+      }
+      steps {
+        sh './gradlew jacocoTestReport jacocoTestCoverageVerification'
+      }
     }
+
+    stage('Build and Push Docker Image') {
+      when {
+        allOf {
+          not { branch 'playground' }
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
+      steps {
+        script {
+          def fullImage = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+          sh """
+            docker build -t ${fullImage} .
+            echo testpassword | docker login https://${REGISTRY} -u testuser --password-stdin
+            docker push ${fullImage}
+          """
+        }
+      }
+    }
+  }
+}
+
+def getImageName() {
+  if (env.BRANCH_NAME == 'master') return 'calculator'
+  if (env.BRANCH_NAME == 'feature') return 'calculator-feature'
+  return 'skip'
+}
+
+def getImageTag() {
+  if (env.BRANCH_NAME == 'master') return '1.0'
+  if (env.BRANCH_NAME == 'feature') return '0.1'
+  return 'skip'
 }
 
