@@ -11,7 +11,7 @@ pipeline {
     stage('Build') {
       steps {
         dir('Chapter08/sample1') {
-          sh './gradlew clean build'
+          sh './gradlew --no-daemon clean build'
         }
       }
     }
@@ -26,7 +26,7 @@ pipeline {
       }
       steps {
         dir('Chapter08/sample1') {
-          sh './gradlew test'
+          sh './gradlew --no-daemon test'
         }
       }
     }
@@ -37,7 +37,7 @@ pipeline {
       }
       steps {
         dir('Chapter08/sample1') {
-          sh './gradlew jacocoTestReport jacocoTestCoverageVerification'
+          sh './gradlew --no-daemon jacocoTestReport jacocoTestCoverageVerification'
         }
       }
     }
