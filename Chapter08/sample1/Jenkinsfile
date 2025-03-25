@@ -1,55 +1,79 @@
-stage('Build') {
-  steps {
-    dir('Chapter08/sample1') {
-      sh './gradlew clean build'
-    }
-  }
-}
+pipeline {
+  agent any
 
-stage('Unit Tests') {
-  when {
-    anyOf {
-      branch 'master'
-      branch 'feature'
-      branch 'playground'
-    }
+  environment {
+    REGISTRY   = 'localhost:5001'
+    IMAGE_NAME = getImageName()
+    IMAGE_TAG  = getImageTag()
   }
-  steps {
-    dir('Chapter08/sample1') {
-      sh './gradlew test'
-    }
-  }
-}
 
-stage('Code Coverage') {
-  when {
-    branch 'master'
-  }
-  steps {
-    dir('Chapter08/sample1') {
-      sh './gradlew jacocoTestReport jacocoTestCoverageVerification'
+  stages {
+    stage('Build') {
+      steps {
+        dir('Chapter08/sample1') {
+          sh './gradlew clean build'
+        }
+      }
     }
-  }
-}
 
-stage('Build and Push Docker Image') {
-  when {
-    allOf {
-      not { branch 'playground' }
-      expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+    stage('Unit Tests') {
+      when {
+        anyOf {
+          branch 'master'
+          branch 'feature'
+          branch 'playground'
+        }
+      }
+      steps {
+        dir('Chapter08/sample1') {
+          sh './gradlew test'
+        }
+      }
     }
-  }
-  steps {
-    dir('Chapter08/sample1') {
-      script {
-        def fullImage = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-        sh """
-          docker build -t ${fullImage} .
-          echo testpassword | docker login https://${REGISTRY} -u testuser --password-stdin
-          docker push ${fullImage}
-        """
+
+    stage('Code Coverage') {
+      when {
+        branch 'master'
+      }
+      steps {
+        dir('Chapter08/sample1') {
+          sh './gradlew jacocoTestReport jacocoTestCoverageVerification'
+        }
+      }
+    }
+
+    stage('Build and Push Docker Image') {
+      when {
+        allOf {
+          not { branch 'playground' }
+          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+        }
+      }
+      steps {
+        dir('Chapter08/sample1') {
+          script {
+            def fullImage = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+            sh """
+              docker build -t ${fullImage} .
+              echo testpassword | docker login https://${REGISTRY} -u testuser --password-stdin
+              docker push ${fullImage}
+            """
+          }
+        }
       }
     }
   }
+}
+
+def getImageName() {
+  if (env.BRANCH_NAME == 'master') return 'calculator'
+  if (env.BRANCH_NAME == 'feature') return 'calculator-feature'
+  return 'skip'
+}
+
+def getImageTag() {
+  if (env.BRANCH_NAME == 'master') return '1.0'
+  if (env.BRANCH_NAME == 'feature') return '0.1'
+  return 'skip'
 }
 
