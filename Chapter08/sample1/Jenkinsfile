@@ -8,15 +8,11 @@ pipeline {
   }
 
   stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
-    }
-
     stage('Build') {
       steps {
-        sh './gradlew clean build'
+        dir('Chapter08/sample1') {
+          sh './gradlew clean build'
+        }
       }
     }
 
@@ -29,7 +25,9 @@ pipeline {
         }
       }
       steps {
-        sh './gradlew test'
+        dir('Chapter08/sample1') {
+          sh './gradlew test'
+        }
       }
     }
 
@@ -38,7 +36,9 @@ pipeline {
         branch 'master'
       }
       steps {
-        sh './gradlew jacocoTestReport jacocoTestCoverageVerification'
+        dir('Chapter08/sample1') {
+          sh './gradlew jacocoTestReport jacocoTestCoverageVerification'
+        }
       }
     }
 
@@ -50,13 +50,15 @@ pipeline {
         }
       }
       steps {
-        script {
-          def fullImage = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-          sh """
-            docker build -t ${fullImage} .
-            echo testpassword | docker login https://${REGISTRY} -u testuser --password-stdin
-            docker push ${fullImage}
-          """
+        dir('Chapter08/sample1') {
+          script {
+            def fullImage = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+            sh """
+              docker build -t ${fullImage} .
+              echo testpassword | docker login https://${REGISTRY} -u testuser --password-stdin
+              docker push ${fullImage}
+            """
+          }
         }
       }
     }
