@@ -31,6 +31,21 @@ pipeline {
       }
     }
 
+    stage('Static Code Analysis') {
+      when {
+        anyOf {
+          branch 'master'
+          branch 'feature'
+          branch 'playground'
+        }
+      }
+      steps {
+        dir('Chapter08/sample1') {
+          sh './gradlew --no-daemon checkstyleMain'
+        }
+      }
+    }
+
     stage('Code Coverage') {
       when {
         branch 'master'
@@ -61,6 +76,15 @@ pipeline {
           }
         }
       }
+    }
+  }
+
+  post {
+    success {
+      echo 'Pipeline completed successfully.'
+    }
+    failure {
+      echo 'Pipeline failed. Check logs for details.'
     }
   }
 }
