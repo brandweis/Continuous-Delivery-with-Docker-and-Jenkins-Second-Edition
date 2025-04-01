@@ -10,7 +10,11 @@ pipeline {
     stage('Deploy Calculator and Hazelcast') {
       steps {
         sh '''
-          echo "Creating Docker network..."
+          echo "Cleaning up any old containers..."
+          docker stop hazelcast || true
+          docker stop calculator || true
+          docker rm -f hazelcast || true
+          docker rm -f calculator || true
           docker network create ${NETWORK} || true
 
           echo "Starting Hazelcast..."
@@ -25,7 +29,7 @@ pipeline {
           echo "Starting calculator container..."
           docker run -d --rm --name calculator --network ${NETWORK} ${IMAGE_NAME}
 
-          echo "Giving calculator app a moment to warm up..."
+          echo "Giving calculator app time to start..."
           sleep 5
         '''
       }
@@ -34,9 +38,8 @@ pipeline {
     stage('Test Division') {
       steps {
         sh '''
-          echo "Running division test..."
+          echo "Testing valid division..."
           DIV_RESULT=$(curl -s calculator:8080/div?a=6\\&b=2)
-
           echo "Result: $DIV_RESULT"
           if [ "$DIV_RESULT" -eq 3 ]; then
             echo "Division test passed"
@@ -45,11 +48,10 @@ pipeline {
             exit 1
           fi
 
-          echo "Running divide-by-zero test..."
+          echo "Testing divide-by-zero..."
           ERROR_RESULT=$(curl -s -o /dev/null -w "%{http_code}" calculator:8080/div?a=6\\&b=0)
-
           if [ "$ERROR_RESULT" -ne 200 ]; then
-            echo "Divide-by-zero returned proper error"
+            echo "Divide-by-zero error returned properly"
           else
             echo "Divide-by-zero test failed"
             exit 1
@@ -62,7 +64,7 @@ pipeline {
   post {
     always {
       sh '''
-        echo "Cleaning up..."
+        echo "Cleaning up containers and network..."
         docker stop calculator || true
         docker stop hazelcast || true
         docker network rm ${NETWORK} || true
