@@ -4,70 +4,41 @@ pipeline {
   environment {
     REGISTRY = 'localhost:5001'
     IMAGE = "${REGISTRY}/calculator:1.0"
+    NETWORK = 'jenkins'
   }
 
   stages {
     stage('Deploy Calculator and Hazelcast') {
       steps {
-        dir('Chapter08/sample1') {
-          sh '''
-            echo "Starting Hazelcast..."
-            docker-compose -f hazelcast.yaml up -d
-            echo "Starting Calculator..."
-            docker-compose -f calculator.yaml up -d
-            echo "Waiting for services to initialize..."
-            sleep 10
-          '''
-        }
+        sh '''
+          docker network create ${NETWORK} || true
+          docker run -d --rm --name hazelcast --network ${NETWORK} hazelcast/hazelcast:5.0.2
+          docker run -d --rm --name calculator --network ${NETWORK} -p 8080:8080 ${IMAGE}
+          sleep 10
+        '''
       }
     }
 
     stage('Test Division') {
       steps {
-        script {
-          echo "Testing 6 / 2 == 3"
-          sh '''
-            DIV_RESULT=$(curl -s calculator-service:8080/div?a=6\\&b=2)
-            echo "Received: $DIV_RESULT"
-            if [ "$DIV_RESULT" -eq 3 ]; then
-              echo "PASS: 6 / 2 = $DIV_RESULT"
-            else
-              echo "FAIL: Expected 3, got $DIV_RESULT"
-              exit 1
-            fi
-          '''
+        sh '''
+          DIV_RESULT=$(curl -s calculator:8080/div?a=6\\&b=2)
+          test "$DIV_RESULT" -eq 3
 
-          echo "Testing divide by zero"
-          sh '''
-            ERROR_MSG=$(curl -s calculator-service:8080/div?a=6\\&b=0 || true)
-            echo "Response: $ERROR_MSG"
-            if echo "$ERROR_MSG" | grep -qi "error"; then
-              echo "PASS: Division by zero error handled"
-            else
-              echo "FAIL: No error message for divide by zero"
-              exit 1
-            fi
-          '''
-        }
+          ERROR_MSG=$(curl -s calculator:8080/div?a=6\\&b=0 || true)
+          echo "$ERROR_MSG" | grep -qi "error"
+        '''
       }
     }
   }
 
   post {
     always {
-      dir('Chapter08/sample1') {
-        sh '''
-          echo "Cleaning up..."
-          docker-compose -f calculator.yaml down || true
-          docker-compose -f hazelcast.yaml down || true
-        '''
-      }
-    }
-    success {
-      echo "Pipeline completed successfully!"
-    }
-    failure {
-      echo "Pipeline failed — see logs for details."
+      sh '''
+        docker stop calculator || true
+        docker stop hazelcast || true
+        docker network rm ${NETWORK} || true
+      '''
     }
   }
 }
