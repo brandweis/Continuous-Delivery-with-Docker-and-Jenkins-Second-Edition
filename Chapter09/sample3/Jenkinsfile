@@ -12,9 +12,9 @@ pipeline {
         dir('Chapter08/sample1') {
           sh '''
             echo "Starting Hazelcast..."
-            docker compose -f hazelcast.yaml up -d
+            docker-compose -f hazelcast.yaml up -d
             echo "Starting Calculator..."
-            docker compose -f calculator.yaml up -d
+            docker-compose -f calculator.yaml up -d
             echo "Waiting for services to initialize..."
             sleep 10
           '''
@@ -22,7 +22,7 @@ pipeline {
       }
     }
 
-    stage('Test Division Endpoint') {
+    stage('Test Division') {
       steps {
         script {
           echo "Testing 6 / 2 == 3"
@@ -58,8 +58,8 @@ pipeline {
       dir('Chapter08/sample1') {
         sh '''
           echo "Cleaning up..."
-          docker compose -f calculator.yaml down || true
-          docker compose -f hazelcast.yaml down || true
+          docker-compose -f calculator.yaml down || true
+          docker-compose -f hazelcast.yaml down || true
         '''
       }
     }
