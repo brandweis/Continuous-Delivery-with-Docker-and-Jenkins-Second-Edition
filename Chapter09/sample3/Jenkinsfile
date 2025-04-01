@@ -28,7 +28,7 @@ pipeline {
             done
 
             echo Starting Calculator on port ${HOST_PORT}...
-            docker run -d --name calculator --network jenkins -p ${HOST_PORT}:8080 ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+            docker run -d --name calculator --network jenkins -p ${HOST_PORT}:8080 -e HAZELCAST_NETWORK_ADDRESSES=hazelcast:5701 ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
 
             echo Waiting for Calculator to start...
             sleep 10
