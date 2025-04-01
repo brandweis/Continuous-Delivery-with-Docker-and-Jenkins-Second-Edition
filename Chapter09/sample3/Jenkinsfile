@@ -15,8 +15,7 @@ pipeline {
     stage('Deploy Calculator and Hazelcast') {
       steps {
         script {
-          def port = env.HOST_PORT
-          sh """
+          sh '''
             echo Creating Docker network if not exists...
             docker network create jenkins || true
 
@@ -25,24 +24,25 @@ pipeline {
 
             echo Waiting for Hazelcast to be ready...
             i=1
-            while [ "\$i" -le 10 ]; do
+            while [ "$i" -le 10 ]; do
               docker run --rm --network jenkins curlimages/curl curl -sf http://hazelcast:5701/hazelcast/health && break
-              echo Retry \$i: Hazelcast not ready yet.
-              i=\$(expr \$i + 1)
+              echo Retry $i: Hazelcast not ready yet.
+              i_temp=`expr "$i" + 1`
+              i=$i_temp
               sleep 5
             done
 
-            echo Starting Calculator on port $port...
-            docker run -d --rm --name calculator \\
-              --network jenkins \\
-              -p $port:8080 \\
-              -v \$(pwd)/Chapter09/sample3/hazelcast-client.yaml:/app/hazelcast-client.yaml \\
-              -e SPRING_HAZELCAST_CONFIG=file:/app/hazelcast-client.yaml \\
+            echo Starting Calculator on port 8081...
+            docker run -d --rm --name calculator \
+              --network jenkins \
+              -p 8081:8080 \
+              -v $(pwd)/Chapter09/sample3/hazelcast-client.yaml:/app/hazelcast-client.yaml \
+              -e SPRING_HAZELCAST_CONFIG=file:/app/hazelcast-client.yaml \
               localhost:5001/calculator:1.0
 
             echo Waiting for Calculator to start...
             sleep 10
-          """
+          '''
         }
       }
     }
@@ -50,11 +50,11 @@ pipeline {
     stage('Test Division') {
       steps {
         script {
-          sh """
+          sh '''
             echo Testing division: 6 / 2
-            RESULT=\$(curl -s "http://localhost:${env.HOST_PORT}/div?a=6&b=2")
-            echo "Division Result: \$RESULT"
-          """
+            RESULT=$(curl -s "http://localhost:8081/div?a=6&b=2")
+            echo "Division Result: $RESULT"
+          '''
         }
       }
     }
