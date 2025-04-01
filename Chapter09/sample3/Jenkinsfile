@@ -51,7 +51,7 @@ pipeline {
         script {
           sh """
             echo Testing division: 6 / 2
-            RESULT=\$(curl -s http://localhost:${HOST_PORT}/div?a=6&b=2)
+            RESULT=\$(curl -s "http://localhost:${HOST_PORT}/div?a=6&b=2")
             echo "Division Result: \$RESULT"
           """
         }
