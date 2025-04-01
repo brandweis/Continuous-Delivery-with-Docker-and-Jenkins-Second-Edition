@@ -17,12 +17,11 @@ pipeline {
           docker run -d --rm --name hazelcast --network ${NETWORK_NAME} hazelcast/hazelcast:5.0.2
 
           echo "Waiting for Hazelcast to be ready..."
-          for i in {1..10}; do
-            if docker run --rm --network ${NETWORK_NAME} curlimages/curl:latest curl -sf http://hazelcast:5701/hazelcast/health; then
-              echo "Hazelcast is ready."
-              break
-            fi
+          i=1
+          while [ $i -le 10 ]; do
+            docker run --rm --network ${NETWORK_NAME} curlimages/curl curl -sf http://hazelcast:5701/hazelcast/health && break
             echo "Retry $i: Hazelcast not ready yet."
+            i=$((i+1))
             sleep 5
           done
 
@@ -39,14 +38,24 @@ pipeline {
       steps {
         sh '''
           echo "Testing division: 6 / 2"
-          DIV_RESULT=$(docker run --rm --network ${NETWORK_NAME} curlimages/curl:latest curl -s http://calculator:8080/div?a=6\\&b=2)
+          DIV_RESULT=$(docker run --rm --network ${NETWORK_NAME} curlimages/curl curl -s http://calculator:8080/div?a=6\\&b=2)
           echo "Result: $DIV_RESULT"
-          test "$DIV_RESULT" -eq 3 && echo "PASS: 6 / 2 = 3" || (echo "FAIL: expected 3, got $DIV_RESULT" && exit 1)
+          if [ "$DIV_RESULT" -eq 3 ]; then
+            echo "PASS: 6 / 2 = 3"
+          else
+            echo "FAIL: Expected 3, got $DIV_RESULT"
+            exit 1
+          fi
 
           echo "Testing division by zero: 6 / 0"
-          DIV_ZERO_RESULT=$(docker run --rm --network ${NETWORK_NAME} curlimages/curl:latest curl -s -o /dev/null -w "%{http_code}" http://calculator:8080/div?a=6\\&b=0)
-          echo "HTTP Status: $DIV_ZERO_RESULT"
-          test "$DIV_ZERO_RESULT" -ge 400 && echo "PASS: Division by zero returned error as expected" || (echo "FAIL: Division by zero did not return error" && exit 1)
+          STATUS_CODE=$(docker run --rm --network ${NETWORK_NAME} curlimages/curl curl -s -o /dev/null -w "%{http_code}" http://calculator:8080/div?a=6\\&b=0)
+          echo "HTTP status: $STATUS_CODE"
+          if [ "$STATUS_CODE" -ge 400 ]; then
+            echo "PASS: Division by zero returned HTTP error"
+          else
+            echo "FAIL: Division by zero did not return error"
+            exit 1
+          fi
         '''
       }
     }
