@@ -2,9 +2,10 @@ pipeline {
   agent any
 
   environment {
-    REGISTRY = 'localhost:5001'
-    IMAGE = "${REGISTRY}/calculator:1.0"
-    NETWORK = 'jenkins'
+    REGISTRY   = 'localhost:5001'
+    IMAGE_NAME = 'calculator'
+    IMAGE_TAG  = '1.0'
+    HOST_PORT  = '8081'
   }
 
   stages {
@@ -13,26 +14,21 @@ pipeline {
         script {
           sh '''
             echo Creating Docker network if not exists...
-            docker network create ${NETWORK} || true
+            docker network create jenkins || true
 
             echo Starting Hazelcast...
-            docker run -d --rm --name hazelcast --network ${NETWORK} hazelcast/hazelcast:5.0.2
+            docker run -d --rm --name hazelcast --network jenkins hazelcast/hazelcast:5.0.2
 
             echo Waiting for Hazelcast to be ready...
             i=1
-            while [ $i -le 10 ]; do
-              if docker run --rm --network ${NETWORK} curlimages/curl curl -sf http://hazelcast:5701/hazelcast/health; then
-                echo Hazelcast is healthy.
-                break
-              else
-                echo Retry $i: Hazelcast not ready yet.
-                i=$((i+1))
-                sleep 5
-              fi
+            until docker run --rm --network jenkins curlimages/curl curl -sf http://hazelcast:5701/hazelcast/health || [ $i -eq 10 ]; do
+              echo Retry $i: Hazelcast not ready yet.
+              i=$((i+1))
+              sleep 5
             done
 
-            echo Starting Calculator...
-            docker run -d --rm --name calculator --network ${NETWORK} -p 8081:8080 ${IMAGE}
+            echo Starting Calculator on port ${HOST_PORT}...
+            docker run -d --rm --name calculator --network jenkins -p ${HOST_PORT}:8080 ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
 
             echo Waiting for Calculator to start...
             sleep 10
@@ -46,22 +42,21 @@ pipeline {
         script {
           sh '''
             echo Testing division: 6 / 2
-            DIV_RESULT=$(curl -s http://localhost:8081/div?a=6\\&b=2)
-            echo "Result: $DIV_RESULT"
-            if [ "$DIV_RESULT" = "3" ]; then
-              echo "PASS: Division result is correct."
+            RESULT=$(curl -s http://localhost:${HOST_PORT}/div?a=6\\&b=2)
+            echo "Result: $RESULT"
+            if [ "$RESULT" = "3" ]; then
+              echo "Division test passed"
             else
-              echo "FAIL: Division result incorrect or empty."
+              echo "Division test failed"
               exit 1
             fi
 
-            echo Testing divide by zero: 6 / 0
-            ZERO_RESULT=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/div?a=6\\&b=0)
-            echo "HTTP status: $ZERO_RESULT"
-            if [ "$ZERO_RESULT" -ge 400 ]; then
-              echo "PASS: Divide-by-zero returned error as expected."
+            echo Testing divide-by-zero
+            RESPONSE=$(curl -s -w "%{http_code}" -o /dev/null http://localhost:${HOST_PORT}/div?a=6\\&b=0)
+            if [ "$RESPONSE" = "400" ] || [ "$RESPONSE" = "500" ]; then
+              echo "Divide-by-zero test passed (received HTTP $RESPONSE)"
             else
-              echo "FAIL: Expected error on divide by zero."
+              echo "Divide-by-zero test failed (received HTTP $RESPONSE)"
               exit 1
             fi
           '''
@@ -77,7 +72,7 @@ pipeline {
           echo Cleaning up...
           docker stop calculator || true
           docker stop hazelcast || true
-          docker network rm ${NETWORK} || true
+          docker network rm jenkins || true
         '''
       }
       echo 'Pipeline completed. Check logs for test output.'
