@@ -1,0 +1,6 @@
+hazelcast-client:
+  cluster-name: dev
+  network:
+    cluster-members:
+      - hazelcast:5701
+
