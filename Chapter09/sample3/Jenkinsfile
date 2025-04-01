@@ -2,73 +2,84 @@ pipeline {
   agent any
 
   environment {
-    CALCULATOR_IMAGE = 'localhost:5001/calculator:1.0'
-    NETWORK_NAME = 'jenkins'
+    REGISTRY = 'localhost:5001'
+    IMAGE = "${REGISTRY}/calculator:1.0"
+    NETWORK = 'jenkins'
   }
 
   stages {
     stage('Deploy Calculator and Hazelcast') {
       steps {
-        sh '''
-          echo "Creating Docker network if not exists..."
-          docker network create ${NETWORK_NAME} || true
+        script {
+          sh '''
+            echo Creating Docker network if not exists...
+            docker network create ${NETWORK} || true
 
-          echo "Starting Hazelcast..."
-          docker run -d --rm --name hazelcast --network ${NETWORK_NAME} hazelcast/hazelcast:5.0.2
+            echo Starting Hazelcast...
+            docker run -d --rm --name hazelcast --network ${NETWORK} hazelcast/hazelcast:5.0.2
 
-          echo "Waiting for Hazelcast to be ready..."
-          i=1
-          while [ $i -le 10 ]; do
-            docker run --rm --network ${NETWORK_NAME} curlimages/curl curl -sf http://hazelcast:5701/hazelcast/health && break
-            echo "Retry $i: Hazelcast not ready yet."
-            i=$((i+1))
-            sleep 5
-          done
+            echo Waiting for Hazelcast to be ready...
+            i=1
+            while [ $i -le 10 ]; do
+              if docker run --rm --network ${NETWORK} curlimages/curl curl -sf http://hazelcast:5701/hazelcast/health; then
+                echo Hazelcast is healthy.
+                break
+              else
+                echo Retry $i: Hazelcast not ready yet.
+                i=$((i+1))
+                sleep 5
+              fi
+            done
 
-          echo "Starting Calculator..."
-          docker run -d --rm --name calculator --network ${NETWORK_NAME} ${CALCULATOR_IMAGE}
+            echo Starting Calculator with exposed port...
+            docker run -d --rm --name calculator --network ${NETWORK} -p 8080:8080 ${IMAGE}
 
-          echo "Waiting for Calculator to start..."
-          sleep 10
-        '''
+            echo Waiting for Calculator to start...
+            sleep 10
+          '''
+        }
       }
     }
 
     stage('Test Division') {
       steps {
-        sh '''
-          echo "Testing division: 6 / 2"
-          DIV_RESULT=$(docker run --rm --network ${NETWORK_NAME} curlimages/curl curl -s http://calculator:8080/div?a=6\\&b=2)
-          echo "Result: $DIV_RESULT"
-          if [ "$DIV_RESULT" -eq 3 ]; then
-            echo "PASS: 6 / 2 = 3"
-          else
-            echo "FAIL: Expected 3, got $DIV_RESULT"
-            exit 1
-          fi
+        script {
+          sh '''
+            echo Testing division: 6 / 2
+            DIV_RESULT=$(curl -s http://localhost:8080/div?a=6\\&b=2)
+            echo "Result: $DIV_RESULT"
+            if [ "$DIV_RESULT" = "3" ]; then
+              echo "PASS: Division result is correct."
+            else
+              echo "FAIL: Division result incorrect or empty."
+              exit 1
+            fi
 
-          echo "Testing division by zero: 6 / 0"
-          STATUS_CODE=$(docker run --rm --network ${NETWORK_NAME} curlimages/curl curl -s -o /dev/null -w "%{http_code}" http://calculator:8080/div?a=6\\&b=0)
-          echo "HTTP status: $STATUS_CODE"
-          if [ "$STATUS_CODE" -ge 400 ]; then
-            echo "PASS: Division by zero returned HTTP error"
-          else
-            echo "FAIL: Division by zero did not return error"
-            exit 1
-          fi
-        '''
+            echo Testing divide by zero: 6 / 0
+            ZERO_RESULT=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/div?a=6\\&b=0)
+            echo "HTTP status: $ZERO_RESULT"
+            if [ "$ZERO_RESULT" -ge 400 ]; then
+              echo "PASS: Divide-by-zero returned error as expected."
+            else
+              echo "FAIL: Expected error on divide by zero."
+              exit 1
+            fi
+          '''
+        }
       }
     }
   }
 
   post {
     always {
-      sh '''
-        echo "Cleaning up..."
-        docker stop calculator || true
-        docker stop hazelcast || true
-        docker network rm ${NETWORK_NAME} || true
-      '''
+      script {
+        sh '''
+          echo Cleaning up...
+          docker stop calculator || true
+          docker stop hazelcast || true
+          docker network rm ${NETWORK} || true
+        '''
+      }
       echo 'Pipeline completed. Check logs for test output.'
     }
   }
