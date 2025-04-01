@@ -31,8 +31,8 @@ pipeline {
               fi
             done
 
-            echo Starting Calculator with exposed port...
-            docker run -d --rm --name calculator --network ${NETWORK} -p 8080:8080 ${IMAGE}
+            echo Starting Calculator...
+            docker run -d --rm --name calculator --network ${NETWORK} -p 8081:8080 ${IMAGE}
 
             echo Waiting for Calculator to start...
             sleep 10
@@ -46,7 +46,7 @@ pipeline {
         script {
           sh '''
             echo Testing division: 6 / 2
-            DIV_RESULT=$(curl -s http://localhost:8080/div?a=6\\&b=2)
+            DIV_RESULT=$(curl -s http://localhost:8081/div?a=6\\&b=2)
             echo "Result: $DIV_RESULT"
             if [ "$DIV_RESULT" = "3" ]; then
               echo "PASS: Division result is correct."
@@ -56,7 +56,7 @@ pipeline {
             fi
 
             echo Testing divide by zero: 6 / 0
-            ZERO_RESULT=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/div?a=6\\&b=0)
+            ZERO_RESULT=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/div?a=6\\&b=0)
             echo "HTTP status: $ZERO_RESULT"
             if [ "$ZERO_RESULT" -ge 400 ]; then
               echo "PASS: Divide-by-zero returned error as expected."
