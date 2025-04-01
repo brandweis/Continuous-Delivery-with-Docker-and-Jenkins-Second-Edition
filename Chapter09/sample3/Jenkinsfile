@@ -20,7 +20,7 @@ pipeline {
             docker network create jenkins || true
 
             echo Starting Hazelcast...
-            docker run -d --rm --name hazelcast --network jenkins hazelcast/hazelcast:4.2
+            docker run -d --rm --name hazelcast --network jenkins hazelcast/hazelcast:3.12
 
             echo Waiting for Hazelcast to be ready...
             i=1
