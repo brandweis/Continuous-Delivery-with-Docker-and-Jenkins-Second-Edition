@@ -19,8 +19,8 @@ pipeline {
             echo Creating Docker network if not exists...
             docker network create jenkins || true
 
-            echo Starting Hazelcast...
-            docker run -d --rm --name hazelcast --network jenkins hazelcast/hazelcast:5.0.2
+            echo Starting Hazelcast (v3.12)...
+            docker run -d --rm --name hazelcast --network jenkins hazelcast/hazelcast:3.12
 
             echo Waiting for Hazelcast to be ready...
             i=1
@@ -35,7 +35,7 @@ pipeline {
             docker run -d --rm --name calculator \\
               --network jenkins \\
               -p ${HOST_PORT}:8080 \\
-              -v /var/jenkins_home/workspace/\$JOB_NAME/Chapter09/sample3/hazelcast-client.yaml:/app/hazelcast-client.yaml \\
+              -v \$(pwd)/Chapter09/sample3/hazelcast-client.yaml:/app/hazelcast-client.yaml \\
               -e SPRING_HAZELCAST_CONFIG=file:/app/hazelcast-client.yaml \\
               localhost:5001/calculator:1.0
 
