@@ -20,7 +20,7 @@ pipeline {
             docker network create jenkins || true
 
             echo Starting Hazelcast...
-            docker run -d --rm --name hazelcast --network jenkins hazelcast/hazelcast:3.12
+            docker run -d --name hazelcast --network jenkins hazelcast/hazelcast:3.12
 
             echo Waiting for Hazelcast to be ready...
             i=1
@@ -32,7 +32,7 @@ pipeline {
             done
 
             echo Starting Calculator on port $HOST_PORT...
-            docker run -d --rm --name calculator \\
+            docker run -d --name calculator \\
               --network jenkins \\
               -p $HOST_PORT:8080 \\
               -v /var/jenkins_home/workspace/ex9-pipeline/Chapter09/sample3/hazelcast-client.yaml:/app/hazelcast-client.yaml \\
