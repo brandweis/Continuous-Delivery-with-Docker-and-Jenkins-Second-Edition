@@ -2,35 +2,35 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_NAME = 'localhost:5001/calculator:1.0'
-    NETWORK = 'jenkins'
+    CALCULATOR_IMAGE = 'localhost:5001/calculator:1.0'
+    NETWORK_NAME = 'jenkins'
   }
 
   stages {
     stage('Deploy Calculator and Hazelcast') {
       steps {
         sh '''
-          echo "Cleaning up any old containers..."
-          docker stop hazelcast || true
-          docker stop calculator || true
-          docker rm -f hazelcast || true
-          docker rm -f calculator || true
-          docker network create ${NETWORK} || true
+          echo "Creating Docker network if not exists..."
+          docker network create ${NETWORK_NAME} || true
 
           echo "Starting Hazelcast..."
-          docker run -d --rm --name hazelcast --network ${NETWORK} hazelcast/hazelcast:5.0.2
+          docker run -d --rm --name hazelcast --network ${NETWORK_NAME} hazelcast/hazelcast:5.0.2
 
-          echo "Waiting for Hazelcast to become ready..."
-          until docker exec hazelcast curl -s localhost:5701/hazelcast/health | grep -q "HEALTHY"; do
-            echo "Waiting for Hazelcast..."
-            sleep 2
+          echo "Waiting for Hazelcast to be ready..."
+          for i in {1..10}; do
+            if docker run --rm --network ${NETWORK_NAME} curlimages/curl:latest curl -sf http://hazelcast:5701/hazelcast/health; then
+              echo "Hazelcast is ready."
+              break
+            fi
+            echo "Retry $i: Hazelcast not ready yet."
+            sleep 5
           done
 
-          echo "Starting calculator container..."
-          docker run -d --rm --name calculator --network ${NETWORK} ${IMAGE_NAME}
+          echo "Starting Calculator..."
+          docker run -d --rm --name calculator --network ${NETWORK_NAME} ${CALCULATOR_IMAGE}
 
-          echo "Giving calculator app time to start..."
-          sleep 5
+          echo "Waiting for Calculator to start..."
+          sleep 10
         '''
       }
     }
@@ -38,24 +38,15 @@ pipeline {
     stage('Test Division') {
       steps {
         sh '''
-          echo "Testing valid division..."
-          DIV_RESULT=$(curl -s calculator:8080/div?a=6\\&b=2)
+          echo "Testing division: 6 / 2"
+          DIV_RESULT=$(docker run --rm --network ${NETWORK_NAME} curlimages/curl:latest curl -s http://calculator:8080/div?a=6\\&b=2)
           echo "Result: $DIV_RESULT"
-          if [ "$DIV_RESULT" -eq 3 ]; then
-            echo "Division test passed"
-          else
-            echo "Division test failed"
-            exit 1
-          fi
+          test "$DIV_RESULT" -eq 3 && echo "PASS: 6 / 2 = 3" || (echo "FAIL: expected 3, got $DIV_RESULT" && exit 1)
 
-          echo "Testing divide-by-zero..."
-          ERROR_RESULT=$(curl -s -o /dev/null -w "%{http_code}" calculator:8080/div?a=6\\&b=0)
-          if [ "$ERROR_RESULT" -ne 200 ]; then
-            echo "Divide-by-zero error returned properly"
-          else
-            echo "Divide-by-zero test failed"
-            exit 1
-          fi
+          echo "Testing division by zero: 6 / 0"
+          DIV_ZERO_RESULT=$(docker run --rm --network ${NETWORK_NAME} curlimages/curl:latest curl -s -o /dev/null -w "%{http_code}" http://calculator:8080/div?a=6\\&b=0)
+          echo "HTTP Status: $DIV_ZERO_RESULT"
+          test "$DIV_ZERO_RESULT" -ge 400 && echo "PASS: Division by zero returned error as expected" || (echo "FAIL: Division by zero did not return error" && exit 1)
         '''
       }
     }
@@ -64,12 +55,12 @@ pipeline {
   post {
     always {
       sh '''
-        echo "Cleaning up containers and network..."
+        echo "Cleaning up..."
         docker stop calculator || true
         docker stop hazelcast || true
-        docker network rm ${NETWORK} || true
+        docker network rm ${NETWORK_NAME} || true
       '''
-      echo "Pipeline completed. Check logs for test output."
+      echo 'Pipeline completed. Check logs for test output.'
     }
   }
 }
