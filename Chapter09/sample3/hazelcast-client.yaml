@@ -2,4 +2,5 @@ hazelcast-client:
   cluster-name: dev
   network:
     cluster-members:
-      - hazelcast
+      - hazelcast:5701
+
