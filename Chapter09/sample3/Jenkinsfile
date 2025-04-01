@@ -2,8 +2,7 @@ pipeline {
   agent any
 
   environment {
-    REGISTRY = 'localhost:5001'
-    IMAGE = "${REGISTRY}/calculator:1.0"
+    IMAGE_NAME = 'localhost:5001/calculator:1.0'
     NETWORK = 'jenkins'
   }
 
@@ -11,10 +10,23 @@ pipeline {
     stage('Deploy Calculator and Hazelcast') {
       steps {
         sh '''
+          echo "Creating Docker network..."
           docker network create ${NETWORK} || true
+
+          echo "Starting Hazelcast..."
           docker run -d --rm --name hazelcast --network ${NETWORK} hazelcast/hazelcast:5.0.2
-          docker run -d --rm --name calculator --network jenkins ${IMAGE}
-          sleep 20
+
+          echo "Waiting for Hazelcast to become ready..."
+          until docker exec hazelcast curl -s localhost:5701/hazelcast/health | grep -q "HEALTHY"; do
+            echo "Waiting for Hazelcast..."
+            sleep 2
+          done
+
+          echo "Starting calculator container..."
+          docker run -d --rm --name calculator --network ${NETWORK} ${IMAGE_NAME}
+
+          echo "Giving calculator app a moment to warm up..."
+          sleep 5
         '''
       }
     }
@@ -22,11 +34,26 @@ pipeline {
     stage('Test Division') {
       steps {
         sh '''
+          echo "Running division test..."
           DIV_RESULT=$(curl -s calculator:8080/div?a=6\\&b=2)
-          test "$DIV_RESULT" -eq 3
 
-          ERROR_MSG=$(curl -s calculator:8080/div?a=6\\&b=0 || true)
-          echo "$ERROR_MSG" | grep -qi "error"
+          echo "Result: $DIV_RESULT"
+          if [ "$DIV_RESULT" -eq 3 ]; then
+            echo "Division test passed"
+          else
+            echo "Division test failed"
+            exit 1
+          fi
+
+          echo "Running divide-by-zero test..."
+          ERROR_RESULT=$(curl -s -o /dev/null -w "%{http_code}" calculator:8080/div?a=6\\&b=0)
+
+          if [ "$ERROR_RESULT" -ne 200 ]; then
+            echo "Divide-by-zero returned proper error"
+          else
+            echo "Divide-by-zero test failed"
+            exit 1
+          fi
         '''
       }
     }
@@ -35,10 +62,12 @@ pipeline {
   post {
     always {
       sh '''
+        echo "Cleaning up..."
         docker stop calculator || true
         docker stop hazelcast || true
         docker network rm ${NETWORK} || true
       '''
+      echo "Pipeline completed. Check logs for test output."
     }
   }
 }
