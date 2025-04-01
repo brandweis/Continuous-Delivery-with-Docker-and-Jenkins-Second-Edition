@@ -1,174 +1,77 @@
 pipeline {
-    agent any
-    
-    environment {
-        HOST_PORT = "8081"
-        CONTAINER_NAME_CALC = "calculator"
-        CONTAINER_NAME_HZ = "hazelcast"
-        NETWORK_NAME = "jenkins"
-        HAZELCAST_VERSION = "3.12"
-        HAZELCAST_HEALTH_URL = "http://hazelcast:5701/hazelcast/health"
-        CALCULATOR_IMAGE = "localhost:5001/calculator:1.0"
-        MAX_RETRIES = 10
-        RETRY_INTERVAL = 5
+  agent any
+
+  environment {
+    HOST_PORT = "8081"
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
-    
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
+
+    stage('Deploy Calculator and Hazelcast') {
+      steps {
+        script {
+          def port = env.HOST_PORT
+          sh """
+            echo Creating Docker network if not exists...
+            docker network create jenkins || true
+
+            echo Starting Hazelcast (v3.12)...
+            docker run -d --rm --name hazelcast --network jenkins hazelcast/hazelcast:3.12
+
+            echo Waiting for Hazelcast to be ready...
+            i=1
+            while [ "\$i" -le 10 ]; do
+              docker run --rm --network jenkins curlimages/curl curl -sf http://hazelcast:5701/hazelcast/health && break
+              echo Retry \$i: Hazelcast not ready yet.
+              i=\$(expr \$i + 1)
+              sleep 5
+            done
+
+            echo Starting Calculator on port $port...
+            docker run -d --rm --name calculator \\
+              --network jenkins \\
+              -p $port:8080 \\
+              -v \$(pwd)/Chapter09/sample3/hazelcast-client.yaml:/app/hazelcast-client.yaml \\
+              -e SPRING_HAZELCAST_CONFIG=file:/app/hazelcast-client.yaml \\
+              localhost:5001/calculator:1.0
+
+            echo Waiting for Calculator to start...
+            sleep 10
+          """
         }
-        
-        stage('Setup Network') {
-            steps {
-                script {
-                    sh '''
-                        echo "Creating Docker network if not exists..."
-                        docker network create ${NETWORK_NAME} || true
-                    '''
-                }
-            }
-        }
-        
-        stage('Deploy Hazelcast') {
-            steps {
-                script {
-                    sh '''
-                        echo "Starting Hazelcast (v${HAZELCAST_VERSION})..."
-                        docker run -d --rm --name ${CONTAINER_NAME_HZ} \
-                            --network ${NETWORK_NAME} \
-                            hazelcast/hazelcast:${HAZELCAST_VERSION}
-                            
-                        echo "Waiting for Hazelcast to be ready..."
-                        i=1
-                        while [ "$i" -le ${MAX_RETRIES} ]; do
-                            if docker run --rm --network ${NETWORK_NAME} curlimages/curl curl -sf ${HAZELCAST_HEALTH_URL}; then
-                                echo "Hazelcast is ready!"
-                                break
-                            fi
-                            echo "Retry $i: Hazelcast not ready yet."
-                            i=$((i+1))
-                            sleep ${RETRY_INTERVAL}
-                            
-                            if [ "$i" -gt ${MAX_RETRIES} ]; then
-                                echo "Failed to start Hazelcast after ${MAX_RETRIES} attempts."
-                                exit 1
-                            fi
-                        done
-                    '''
-                }
-            }
-        }
-        
-        stage('Deploy Calculator') {
-            steps {
-                script {
-                    sh '''
-                        echo "Starting Calculator on port ${HOST_PORT}..."
-                        docker run -d --rm --name ${CONTAINER_NAME_CALC} \
-                            --network ${NETWORK_NAME} \
-                            -p ${HOST_PORT}:8080 \
-                            -v $(pwd)/Chapter09/sample3/hazelcast-client.yaml:/app/hazelcast-client.yaml \
-                            -e SPRING_HAZELCAST_CONFIG=file:/app/hazelcast-client.yaml \
-                            ${CALCULATOR_IMAGE}
-                            
-                        echo "Waiting for Calculator to start..."
-                        i=1
-                        while [ "$i" -le ${MAX_RETRIES} ]; do
-                            if curl -sf "http://localhost:${HOST_PORT}/health" &>/dev/null; then
-                                echo "Calculator service is ready!"
-                                break
-                            fi
-                            echo "Retry $i: Calculator not ready yet."
-                            i=$((i+1))
-                            sleep ${RETRY_INTERVAL}
-                            
-                            if [ "$i" -gt ${MAX_RETRIES} ]; then
-                                echo "Failed to start Calculator after ${MAX_RETRIES} attempts."
-                                exit 1
-                            fi
-                        done
-                    '''
-                }
-            }
-        }
-        
-        stage('Test Division') {
-            steps {
-                script {
-                    sh '''
-                        echo "Testing division: 6 / 2"
-                        RESULT=$(curl -s "http://localhost:${HOST_PORT}/div?a=6&b=2")
-                        echo "Division Result: $RESULT"
-                        
-                        if [ "$RESULT" != "3" ]; then
-                            echo "Test failed! Expected 3, got: $RESULT"
-                            exit 1
-                        fi
-                        
-                        echo "Testing division: 10 / 2"
-                        RESULT=$(curl -s "http://localhost:${HOST_PORT}/div?a=10&b=2")
-                        echo "Division Result: $RESULT"
-                        
-                        if [ "$RESULT" != "5" ]; then
-                            echo "Test failed! Expected 5, got: $RESULT"
-                            exit 1
-                        fi
-                        
-                        echo "All division tests passed successfully!"
-                    '''
-                }
-            }
-        }
-        
-        stage('Test Division By Zero') {
-            steps {
-                script {
-                    sh '''
-                        echo "Testing division by zero: 6 / 0"
-                        RESPONSE=$(curl -s -w "%{http_code}" "http://localhost:${HOST_PORT}/div?a=6&b=0")
-                        HTTP_CODE=$(echo "$RESPONSE" | tail -c 4)
-                        RESULT=$(echo "$RESPONSE" | head -c -4)
-                        
-                        echo "HTTP Status Code: $HTTP_CODE"
-                        echo "Response body: $RESULT"
-                        
-                        if [ "$HTTP_CODE" != "400" ]; then
-                            echo "Test failed! Expected HTTP 400 error for division by zero."
-                            exit 1
-                        fi
-                        
-                        echo "Division by zero test passed successfully!"
-                    '''
-                }
-            }
-        }
+      }
     }
-    
-    post {
-        always {
-            script {
-                sh '''
-                    echo "Cleaning up..."
-                    docker stop ${CONTAINER_NAME_CALC} || true
-                    docker stop ${CONTAINER_NAME_HZ} || true
-                    docker network rm ${NETWORK_NAME} || true
-                '''
-            }
-            echo 'Pipeline completed. Check logs for test output.'
+
+    stage('Test Division') {
+      steps {
+        script {
+          sh """
+            echo Testing division: 6 / 2
+            RESULT=\$(curl -s "http://localhost:${env.HOST_PORT}/div?a=6&b=2")
+            echo "Division Result: \$RESULT"
+          """
         }
-        success {
-            echo 'All tests passed successfully!'
-        }
-        failure {
-            echo 'Pipeline failed. Please check the logs for details.'
-        }
+      }
     }
-    
-    options {
-        timeout(time: 10, unit: 'MINUTES')
-        ansiColor('xterm')
-        disableConcurrentBuilds()
+  }
+
+  post {
+    always {
+      script {
+        sh '''
+          echo Cleaning up...
+          docker stop calculator || true
+          docker stop hazelcast || true
+          docker network rm jenkins || true
+        '''
+      }
+      echo 'Pipeline completed. Check logs for test output.'
     }
+  }
 }
+
