@@ -14,7 +14,7 @@ pipeline {
           docker network create ${NETWORK} || true
           docker run -d --rm --name hazelcast --network ${NETWORK} hazelcast/hazelcast:5.0.2
           docker run -d --rm --name calculator --network jenkins ${IMAGE}
-          sleep 10
+          sleep 20
         '''
       }
     }
