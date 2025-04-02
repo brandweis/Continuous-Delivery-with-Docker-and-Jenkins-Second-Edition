@@ -2,7 +2,10 @@ pipeline {
     agent any
 
     environment {
-        IMAGE = 'localhost:5001/calculator:exercise9'
+        REGISTRY = 'localhost:5001'
+        IMAGE_NAME = 'calculator'
+        IMAGE_TAG = 'exercise9'
+        FULL_IMAGE = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
     }
 
     stages {
@@ -23,8 +26,8 @@ pipeline {
         stage('Build Image') {
             steps {
                 dir('Chapter08/sample1') {
-                    sh 'docker build -t $IMAGE .'
-                    sh 'docker push $IMAGE'
+                    sh "docker build -t ${FULL_IMAGE} ."
+                    sh "docker push ${FULL_IMAGE}"
                 }
             }
         }
@@ -34,9 +37,16 @@ pipeline {
                 script {
                     sh 'docker network create jenkins-test || true'
                     sh 'docker run -d --rm --name hazelcast --network jenkins-test hazelcast/hazelcast:3.12'
-                    sh 'docker run -d --rm --name calculator --network jenkins-test -p 5002:8080 $IMAGE'
-                    sleep(time: 10, unit: 'SECONDS') // Give the app time to start
-                    sh 'docker run --rm --network jenkins-test curlimages/curl curl -f "http://calculator:8080/div?a=10&b=2"'
+                    sh 'docker run -d --rm --name calculator --network jenkins-test -p 5002:8080 ${FULL_IMAGE}'
+                    sleep(time: 10, unit: 'SECONDS')
+
+                    sh '''
+                        test $(docker run --rm --network jenkins-test curlimages/curl curl -s http://calculator:8080/div?a=6\\&b=2) -eq 3 && echo "PASS: 6 ÷ 2 = 3" || echo "FAIL: 6 ÷ 2 != 3"
+                    '''
+
+                    sh '''
+                        docker run --rm --network jenkins-test curlimages/curl curl -s http://calculator:8080/div?a=10\\&b=0 | grep "Division by 0" && echo "PASS: Division by 0 error handled" || echo "FAIL: Division by 0 not handled properly"
+                    '''
                 }
             }
         }
