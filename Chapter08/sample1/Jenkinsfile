@@ -36,7 +36,7 @@ pipeline {
                     sh 'docker run -d --rm --name hazelcast --network jenkins-test hazelcast/hazelcast:3.12'
                     sh 'docker run -d --rm --name calculator --network jenkins-test -p 5002:8080 $IMAGE'
                     sleep(time: 10, unit: 'SECONDS') // Give the app time to start
-                    sh 'curl -f "http://localhost:5002/div?a=10&b=2"'
+                    sh 'docker run --rm --network jenkins-test curlimages/curl curl -f http://calculator:8080/div?a=10&b=2'
                 }
             }
         }
