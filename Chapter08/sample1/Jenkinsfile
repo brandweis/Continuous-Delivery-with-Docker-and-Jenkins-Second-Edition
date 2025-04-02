@@ -1,10 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'gradle:7.6.0-jdk8'
-            args '-v $HOME/.gradle:/home/gradle/.gradle'
-        }
-    }
+    agent any
 
     environment {
         REGISTRY = "localhost:5001"
@@ -15,7 +10,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'feature', url: 'https://github.com/YOUR_REPO_URL'
+                git branch: 'feature', url: 'https://github.com/brandweis/Continuous-Delivery-with-Docker-and-Jenkins-Second-Edition'
             }
         }
 
