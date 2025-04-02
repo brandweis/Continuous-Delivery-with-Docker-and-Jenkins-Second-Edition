@@ -2,28 +2,30 @@ pipeline {
     agent any
 
     environment {
-        REGISTRY = "localhost:5001"
-        IMAGE = "${REGISTRY}/calculator:exercise9"
-        HAZELCAST_IMAGE = "hazelcast/hazelcast:3.12"
+        IMAGE = 'localhost:5001/calculator:exercise9'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'feature', url: 'https://github.com/brandweis/Continuous-Delivery-with-Docker-and-Jenkins-Second-Edition'
+                checkout scm
             }
         }
 
         stage('Build JAR') {
             steps {
-                sh './gradlew clean build -x test'
+                dir('Chapter08/sample1') {
+                    sh './gradlew clean build -x test'
+                }
             }
         }
 
         stage('Build Image') {
             steps {
-                sh 'docker build -t $IMAGE .'
-                sh 'docker push $IMAGE'
+                dir('Chapter08/sample1') {
+                    sh 'docker build -t $IMAGE .'
+                    sh 'docker push $IMAGE'
+                }
             }
         }
 
@@ -31,14 +33,10 @@ pipeline {
             steps {
                 script {
                     sh 'docker network create jenkins-test || true'
-
-                    sh 'docker run -d --rm --name hazelcast --network jenkins-test $HAZELCAST_IMAGE'
-                    sh '''
-                        docker run -d --rm --name calculator --network jenkins-test \
-                        -p 5002:8080 $IMAGE
-                    '''
-                    sleep time: 5, unit: 'SECONDS'
-                    sh 'curl http://localhost:5002/div?a=10&b=2'
+                    sh 'docker run -d --rm --name hazelcast --network jenkins-test hazelcast/hazelcast:3.12'
+                    sh 'docker run -d --rm --name calculator --network jenkins-test -p 5002:8080 $IMAGE'
+                    sleep(time: 10, unit: 'SECONDS') // Give the app time to start
+                    sh 'curl -f "http://localhost:5002/div?a=10&b=2"'
                 }
             }
         }
@@ -48,6 +46,7 @@ pipeline {
         always {
             sh 'docker stop hazelcast || true'
             sh 'docker stop calculator || true'
+            sh 'docker network rm jenkins-test || true'
         }
     }
 }
