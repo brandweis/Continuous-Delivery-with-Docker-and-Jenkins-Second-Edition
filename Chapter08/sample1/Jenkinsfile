@@ -1,103 +1,59 @@
 pipeline {
-  agent any
-
-  environment {
-    REGISTRY   = 'localhost:5001'
-    IMAGE_NAME = getImageName()
-    IMAGE_TAG  = getImageTag()
-  }
-
-  stages {
-    stage('Build') {
-      steps {
-        dir('Chapter08/sample1') {
-          sh './gradlew --no-daemon clean build'
+    agent {
+        docker {
+            image 'gradle:7.6.0-jdk8'
+            args '-v $HOME/.gradle:/home/gradle/.gradle'
         }
-      }
     }
 
-    stage('Unit Tests') {
-      when {
-        anyOf {
-          branch 'master'
-          branch 'feature'
-          branch 'playground'
-        }
-      }
-      steps {
-        dir('Chapter08/sample1') {
-          sh './gradlew --no-daemon test'
-        }
-      }
+    environment {
+        REGISTRY = "localhost:5001"
+        IMAGE = "${REGISTRY}/calculator:exercise9"
+        HAZELCAST_IMAGE = "hazelcast/hazelcast:3.12"
     }
 
-    stage('Static Code Analysis') {
-      when {
-        anyOf {
-          branch 'master'
-          branch 'feature'
-          branch 'playground'
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'feature', url: 'https://github.com/YOUR_REPO_URL'
+            }
         }
-      }
-      steps {
-        dir('Chapter08/sample1') {
-          sh './gradlew --no-daemon checkstyleMain'
+
+        stage('Build JAR') {
+            steps {
+                sh './gradlew clean build -x test'
+            }
         }
-      }
+
+        stage('Build Image') {
+            steps {
+                sh 'docker build -t $IMAGE .'
+                sh 'docker push $IMAGE'
+            }
+        }
+
+        stage('Test Calculator /div Endpoint') {
+            steps {
+                script {
+                    sh 'docker network create jenkins-test || true'
+
+                    sh 'docker run -d --rm --name hazelcast --network jenkins-test $HAZELCAST_IMAGE'
+                    sh '''
+                        docker run -d --rm --name calculator --network jenkins-test \
+                        -p 5002:8080 $IMAGE
+                    '''
+                    sleep time: 5, unit: 'SECONDS'
+                    sh 'curl http://localhost:5002/div?a=10&b=2'
+                }
+            }
+        }
     }
 
-    stage('Code Coverage') {
-      when {
-        branch 'master'
-      }
-      steps {
-        dir('Chapter08/sample1') {
-          sh './gradlew --no-daemon jacocoTestReport jacocoTestCoverageVerification'
+    post {
+        always {
+            sh 'docker stop hazelcast || true'
+            sh 'docker stop calculator || true'
         }
-      }
     }
-
-    stage('Build and Push Docker Image') {
-      when {
-        allOf {
-          not { branch 'playground' }
-          expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
-        }
-      }
-      steps {
-        dir('Chapter08/sample1') {
-          script {
-            def fullImage = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-            sh """
-              docker build -t ${fullImage} .
-              echo testpassword | docker login https://${REGISTRY} -u testuser --password-stdin
-              docker push ${fullImage}
-            """
-          }
-        }
-      }
-    }
-  }
-
-  post {
-    success {
-      echo 'Pipeline completed successfully.'
-    }
-    failure {
-      echo 'Pipeline failed. Check logs for details.'
-    }
-  }
-}
-
-def getImageName() {
-  if (env.BRANCH_NAME == 'master') return 'calculator'
-  if (env.BRANCH_NAME == 'feature') return 'calculator-feature'
-  return 'skip'
-}
-
-def getImageTag() {
-  if (env.BRANCH_NAME == 'master') return '1.0'
-  if (env.BRANCH_NAME == 'feature') return '0.1'
-  return 'skip'
 }
 
