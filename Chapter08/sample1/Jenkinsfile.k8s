@@ -6,7 +6,18 @@ pipeline {
             steps {
                 echo 'Applying Kubernetes configs using Week 10 agent...'
 
-                withDockerContainer(image: 'dlambrig/gradle-agent-intel:week10', args: '--network host -u root -v $HOME/.kube:/root/.kube') {
+                withDockerContainer(
+                    image: 'dlambrig/gradle-agent-intel:week10',
+                    args: """
+                        --network host
+                        -u root
+                        -v $HOME/.kube:/root/.kube
+                        -v $HOME/.docker/certs.d:/etc/docker/certs.d
+                        -v $(pwd)/auth:/auth
+                        -v $(pwd)/certs:/certs
+                        -v /var/run/docker.sock:/var/run/docker.sock
+                    """
+                ) {
                     sh 'kubectl --insecure-skip-tls-verify apply --validate=false -f Chapter08/sample1/hazelcast.yaml'
                     sh 'kubectl --insecure-skip-tls-verify apply --validate=false -f Chapter08/sample1/calculator.yaml'
                 }
