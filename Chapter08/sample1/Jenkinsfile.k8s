@@ -1,17 +1,15 @@
 pipeline {
-    agent {
-        docker {
-            image 'dlambrig/gradle-agent-intel:week10'
-            args '-v $HOME/.kube:/root/.kube'
-        }
-    }
+    agent any
 
     stages {
         stage('Apply Kubernetes Configs') {
             steps {
                 echo 'Applying Kubernetes configs using Week 10 agent...'
-                sh 'kubectl --insecure-skip-tls-verify apply --validate=false -f Chapter08/sample1/hazelcast.yaml'
-                sh 'kubectl --insecure-skip-tls-verify apply --validate=false -f Chapter08/sample1/calculator.yaml'
+
+                withDockerContainer(image: 'dlambrig/gradle-agent-intel:week10', args: '--network host -u root -v $HOME/.kube:/root/.kube') {
+                    sh 'kubectl --insecure-skip-tls-verify apply --validate=false -f Chapter08/sample1/hazelcast.yaml'
+                    sh 'kubectl --insecure-skip-tls-verify apply --validate=false -f Chapter08/sample1/calculator.yaml'
+                }
             }
         }
     }
