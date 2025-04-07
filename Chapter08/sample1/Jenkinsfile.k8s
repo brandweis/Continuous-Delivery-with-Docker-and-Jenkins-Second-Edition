@@ -10,8 +10,8 @@ pipeline {
         stage('Apply Kubernetes Configs') {
             steps {
                 echo 'Applying Kubernetes configs using Week 10 agent...'
-                sh 'kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/hazelcast.yaml'
-                sh 'kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/calculator.yaml'
+                sh 'kubectl --insecure-skip-tls-verify apply --validate=false -f Chapter08/sample1/hazelcast.yaml'
+                sh 'kubectl --insecure-skip-tls-verify apply --validate=false -f Chapter08/sample1/calculator.yaml'
             }
         }
     }
