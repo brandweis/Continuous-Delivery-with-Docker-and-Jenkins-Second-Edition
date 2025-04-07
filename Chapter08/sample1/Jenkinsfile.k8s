@@ -8,14 +8,14 @@ pipeline {
 
                 withDockerContainer(
                     image: 'dlambrig/gradle-agent-intel:week10',
-                    args: """ 
+                    args: """
                         --network host 
                         -u root 
                         -v $HOME/.kube:/root/.kube 
                         -v $HOME/.docker/certs.d:/etc/docker/certs.d 
-                        -v \$(pwd)/auth:/auth 
-                        -v \$(pwd)/certs:/certs 
-                        -v /var/run/docker.sock:/var/run/docker.sock 
+                        -v ${env.WORKSPACE}/auth:/auth 
+                        -v ${env.WORKSPACE}/certs:/certs 
+                        -v /var/run/docker.sock:/var/run/docker.sock
                     """
                 ) {
                     sh 'kubectl --insecure-skip-tls-verify apply --validate=false -f Chapter08/sample1/hazelcast.yaml'
