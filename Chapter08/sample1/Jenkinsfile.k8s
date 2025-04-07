@@ -11,7 +11,7 @@ pipeline {
                     args: """
                         --network host 
                         -u root 
-                        -v $HOME/.kube:/root/.kube 
+                        -v /home/branweis/.kube:/root/.kube 
                         -v $HOME/.docker/certs.d:/etc/docker/certs.d 
                         -v ${env.WORKSPACE}/auth:/auth 
                         -v ${env.WORKSPACE}/certs:/certs 
