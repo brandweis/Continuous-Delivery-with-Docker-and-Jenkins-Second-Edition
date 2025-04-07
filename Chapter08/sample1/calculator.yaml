@@ -14,6 +14,8 @@ spec:
       labels:
         app: calculator
     spec:
+      imagePullSecrets:
+        - name: regcred
       containers:
       - name: calculator
         image: 172.28.224.1:5001/calculator:latest
