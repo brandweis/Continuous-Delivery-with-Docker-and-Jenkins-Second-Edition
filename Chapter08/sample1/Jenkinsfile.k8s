@@ -1,0 +1,23 @@
+pipeline {
+    agent {
+        docker {
+            image 'dlambrig/gradle-agent-intel:week10'
+            args '-v $HOME/.kube:/root/.kube'
+        }
+    }
+
+    stages {
+        stage('Apply Kubernetes YAMLs') {
+            steps {
+                echo 'Applying Kubernetes configs using Week 10 agent...'
+                sh 'kubectl --insecure-skip-tls-verify apply -f hazelcast.yaml'
+                sh 'kubectl --insecure-skip-tls-verify apply -f calculator.yaml'
+            }
+        }
+    }
+
+    triggers {
+        pollSCM('H/2 * * * *') // Poll GitHub every 2 mins
+    }
+}
+
