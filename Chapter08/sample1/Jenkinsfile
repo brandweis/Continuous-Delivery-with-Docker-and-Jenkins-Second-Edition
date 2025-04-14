@@ -5,7 +5,7 @@ pipeline {
   }
 
   triggers {
-    pollSCM('* * * * *')  // or webhook if set up
+    pollSCM('* * * * *')
   }
 
   environment {
@@ -30,14 +30,14 @@ pipeline {
 
     stage("Unit test") {
       steps {
-        sh 'cd Chapter08/sample1 && ./gradlew test'
+        sh 'cd Chapter08/sample1 && ./gradlew test -Djacoco.skip=true'
       }
     }
 
     stage("Code coverage") {
       steps {
-        sh 'cd Chapter08/sample1 && ./gradlew jacocoTestReport'
-        sh 'cd Chapter08/sample1 && ./gradlew jacocoTestCoverageVerification'
+        sh 'cd Chapter08/sample1 && ./gradlew jacocoTestReport -Djacoco.skip=true'
+        sh 'cd Chapter08/sample1 && ./gradlew jacocoTestCoverageVerification -Djacoco.skip=true'
       }
     }
 
@@ -49,7 +49,7 @@ pipeline {
 
     stage("Build") {
       steps {
-        sh 'cd Chapter08/sample1 && ./gradlew build'
+        sh 'cd Chapter08/sample1 && ./gradlew build -Djacoco.skip=true'
       }
     }
 
