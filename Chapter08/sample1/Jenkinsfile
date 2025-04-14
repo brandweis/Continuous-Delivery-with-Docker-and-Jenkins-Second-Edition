@@ -1,63 +1,107 @@
 pipeline {
-    agent any
 
-    environment {
-        REGISTRY = 'localhost:5001'
-        IMAGE_NAME = 'calculator'
-        IMAGE_TAG = 'exercise9'
-        FULL_IMAGE = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+  agent {
+    label 'week11'
+  }
+
+  triggers {
+    pollSCM('* * * * *') // or webhook if configured
+  }
+
+  environment {
+    IMAGE_NAME = "brandweis/calculator:${BUILD_TIMESTAMP}"
+    LOCAL_IMAGE = "localhost:5000/brandweis/calculator:${BUILD_TIMESTAMP}"
+  }
+
+  stages {
+
+    stage("Compile") {
+      steps {
+        sh "./gradlew compileJava"
+      }
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Build JAR') {
-            steps {
-                dir('Chapter08/sample1') {
-                    sh './gradlew clean build -x test'
-                }
-            }
-        }
-
-        stage('Build Image') {
-            steps {
-                dir('Chapter08/sample1') {
-                    sh "docker build -t ${FULL_IMAGE} ."
-                    sh "docker push ${FULL_IMAGE}"
-                }
-            }
-        }
-
-        stage('Test Calculator /div Endpoint') {
-            steps {
-                script {
-                    sh 'docker network create jenkins-test || true'
-                    sh 'docker run -d --rm --name hazelcast --network jenkins-test hazelcast/hazelcast:3.12'
-                    sh 'docker run -d --rm --name calculator --network jenkins-test -p 5002:8080 ${FULL_IMAGE}'
-                    sleep(time: 10, unit: 'SECONDS')
-
-                    sh '''
-                        test $(docker run --rm --network jenkins-test curlimages/curl curl -s http://calculator:8080/div?a=6\\&b=2) -eq 3 && echo "PASS: 6 ÷ 2 = 3" || echo "FAIL: 6 ÷ 2 != 3"
-                    '''
-
-                    sh '''
-                        docker run --rm --network jenkins-test curlimages/curl curl -s http://calculator:8080/div?a=10\\&b=0 | grep "Division by 0" && echo "PASS: Division by 0 error handled" || echo "FAIL: Division by 0 not handled properly"
-                    '''
-                }
-            }
-        }
+    stage("Unit test") {
+      steps {
+        sh "./gradlew test"
+      }
     }
 
-    post {
-        always {
-            sh 'docker stop hazelcast || true'
-            sh 'docker stop calculator || true'
-            sh 'docker network rm jenkins-test || true'
-        }
+    stage("Code coverage") {
+      steps {
+        sh "./gradlew jacocoTestReport"
+        sh "./gradlew jacocoTestCoverageVerification"
+      }
     }
+
+    stage("Static code analysis") {
+      steps {
+        sh "./gradlew checkstyleMain"
+      }
+    }
+
+    stage("Build") {
+      steps {
+        sh "./gradlew build"
+      }
+    }
+
+    stage("Docker build") {
+      steps {
+        sh "docker build -t $IMAGE_NAME ."
+        sh "docker tag $IMAGE_NAME $LOCAL_IMAGE"
+      }
+    }
+
+    stage("Docker push") {
+      steps {
+        sh "docker push $LOCAL_IMAGE"
+      }
+    }
+
+    stage("Update version") {
+      steps {
+        sh "sed -i 's/{{VERSION}}/${BUILD_TIMESTAMP}/g' deployment.yaml"
+      }
+    }
+
+    stage("Deploy to staging") {
+      steps {
+        sh '''
+          kubectl config use-context docker-desktop
+          kubectl --insecure-skip-tls-verify apply -f hazelcast.yaml
+          kubectl --insecure-skip-tls-verify apply -f deployment.yaml
+          kubectl --insecure-skip-tls-verify apply -f service.yaml
+        '''
+      }
+    }
+
+    stage("Acceptance test") {
+      steps {
+        sleep 60
+        sh "chmod +x acceptance-test.sh && ./acceptance-test.sh"
+      }
+    }
+
+    stage("Release") {
+      steps {
+        sh '''
+          kubectl config use-context gke_ex11-456820_us-east1_hello-cluster
+          kubectl --insecure-skip-tls-verify apply -f hazelcast.yaml
+          kubectl --insecure-skip-tls-verify apply -f deployment.yaml
+          kubectl --insecure-skip-tls-verify apply -f service.yaml
+        '''
+      }
+    }
+
+    stage("Smoke test") {
+      steps {
+        sleep 60
+        sh "chmod +x smoke-test.sh && ./smoke-test.sh"
+      }
+    }
+
+  }
+
 }
 
