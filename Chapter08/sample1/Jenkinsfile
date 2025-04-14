@@ -36,7 +36,7 @@ pipeline {
 
     stage("Code coverage") {
       steps {
-        echo 'Skipping jacoco coverage: JVM crash due to incompatible instrumentation'
+        echo 'Skipping JaCoCo code coverage due to JVM compatibility issue'
         // sh 'cd Chapter08/sample1 && ./gradlew jacocoTestReport'
         // sh 'cd Chapter08/sample1 && ./gradlew jacocoTestCoverageVerification'
       }
