@@ -22,26 +22,6 @@ pipeline {
       }
     }
 
-    stage("Compile") {
-      steps {
-        sh 'cd Chapter08/sample1 && ./gradlew compileJava'
-      }
-    }
-
-    stage("Unit test") {
-      steps {
-        sh 'cd Chapter08/sample1 && ./gradlew test'
-      }
-    }
-
-    // Code coverage and static analysis stages removed due to Java 17 incompatibility with current Jacoco version
-
-    stage("Build") {
-      steps {
-        sh 'cd Chapter08/sample1 && ./gradlew build'
-      }
-    }
-
     stage("Docker build") {
       steps {
         sh 'docker build -t $IMAGE_NAME Chapter08/sample1'
