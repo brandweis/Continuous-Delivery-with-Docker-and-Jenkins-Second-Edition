@@ -30,14 +30,15 @@ pipeline {
 
     stage("Unit test") {
       steps {
-        sh 'cd Chapter08/sample1 && ./gradlew test -Djacoco.skip=true'
+        sh 'cd Chapter08/sample1 && ./gradlew test'
       }
     }
 
     stage("Code coverage") {
       steps {
-        sh 'cd Chapter08/sample1 && ./gradlew jacocoTestReport -Djacoco.skip=true'
-        sh 'cd Chapter08/sample1 && ./gradlew jacocoTestCoverageVerification -Djacoco.skip=true'
+        echo 'Skipping jacoco coverage: JVM crash due to incompatible instrumentation'
+        // sh 'cd Chapter08/sample1 && ./gradlew jacocoTestReport'
+        // sh 'cd Chapter08/sample1 && ./gradlew jacocoTestCoverageVerification'
       }
     }
 
@@ -49,7 +50,7 @@ pipeline {
 
     stage("Build") {
       steps {
-        sh 'cd Chapter08/sample1 && ./gradlew build -Djacoco.skip=true'
+        sh 'cd Chapter08/sample1 && ./gradlew build'
       }
     }
 
