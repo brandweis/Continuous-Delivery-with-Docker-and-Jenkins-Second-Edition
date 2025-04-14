@@ -5,7 +5,7 @@ pipeline {
   }
 
   triggers {
-    pollSCM('* * * * *') // or webhook if configured
+    pollSCM('* * * * *')  // or webhook if set up
   }
 
   environment {
@@ -15,53 +15,60 @@ pipeline {
 
   stages {
 
+    stage("Checkout") {
+      steps {
+        git url: 'https://github.com/brandweis/Continuous-Delivery-with-Docker-and-Jenkins-Second-Edition.git',
+            branch: 'staging-environment'
+      }
+    }
+
     stage("Compile") {
       steps {
-        sh "./gradlew compileJava"
+        sh 'cd Chapter08/sample1 && ./gradlew compileJava'
       }
     }
 
     stage("Unit test") {
       steps {
-        sh "./gradlew test"
+        sh 'cd Chapter08/sample1 && ./gradlew test'
       }
     }
 
     stage("Code coverage") {
       steps {
-        sh "./gradlew jacocoTestReport"
-        sh "./gradlew jacocoTestCoverageVerification"
+        sh 'cd Chapter08/sample1 && ./gradlew jacocoTestReport'
+        sh 'cd Chapter08/sample1 && ./gradlew jacocoTestCoverageVerification'
       }
     }
 
     stage("Static code analysis") {
       steps {
-        sh "./gradlew checkstyleMain"
+        sh 'cd Chapter08/sample1 && ./gradlew checkstyleMain'
       }
     }
 
     stage("Build") {
       steps {
-        sh "./gradlew build"
+        sh 'cd Chapter08/sample1 && ./gradlew build'
       }
     }
 
     stage("Docker build") {
       steps {
-        sh "docker build -t $IMAGE_NAME ."
-        sh "docker tag $IMAGE_NAME $LOCAL_IMAGE"
+        sh 'docker build -t $IMAGE_NAME Chapter08/sample1'
+        sh 'docker tag $IMAGE_NAME $LOCAL_IMAGE'
       }
     }
 
     stage("Docker push") {
       steps {
-        sh "docker push $LOCAL_IMAGE"
+        sh 'docker push $LOCAL_IMAGE'
       }
     }
 
     stage("Update version") {
       steps {
-        sh "sed -i 's/{{VERSION}}/${BUILD_TIMESTAMP}/g' deployment.yaml"
+        sh 'cd Chapter08/sample1 && sed -i "s/{{VERSION}}/${BUILD_TIMESTAMP}/g" deployment.yaml'
       }
     }
 
@@ -69,17 +76,17 @@ pipeline {
       steps {
         sh '''
           kubectl config use-context docker-desktop
-          kubectl --insecure-skip-tls-verify apply -f hazelcast.yaml
-          kubectl --insecure-skip-tls-verify apply -f deployment.yaml
-          kubectl --insecure-skip-tls-verify apply -f service.yaml
+          kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/hazelcast.yaml
+          kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/deployment.yaml
+          kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/service.yaml
         '''
       }
     }
 
     stage("Acceptance test") {
       steps {
-        sleep 60
-        sh "chmod +x acceptance-test.sh && ./acceptance-test.sh"
+        sleep time: 60, unit: 'SECONDS'
+        sh 'cd Chapter08/sample1 && chmod +x acceptance-test.sh && ./acceptance-test.sh'
       }
     }
 
@@ -87,17 +94,17 @@ pipeline {
       steps {
         sh '''
           kubectl config use-context gke_ex11-456820_us-east1_hello-cluster
-          kubectl --insecure-skip-tls-verify apply -f hazelcast.yaml
-          kubectl --insecure-skip-tls-verify apply -f deployment.yaml
-          kubectl --insecure-skip-tls-verify apply -f service.yaml
+          kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/hazelcast.yaml
+          kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/deployment.yaml
+          kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/service.yaml
         '''
       }
     }
 
     stage("Smoke test") {
       steps {
-        sleep 60
-        sh "chmod +x smoke-test.sh && ./smoke-test.sh"
+        sleep time: 60, unit: 'SECONDS'
+        sh 'cd Chapter08/sample1 && chmod +x smoke-test.sh && ./smoke-test.sh'
       }
     }
 
