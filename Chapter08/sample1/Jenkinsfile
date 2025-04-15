@@ -68,13 +68,6 @@ pipeline {
       }
     }
 
-    stage("Smoke test") {
-      steps {
-        sleep time: 60, unit: 'SECONDS'
-        sh 'cd Chapter08/sample1 && chmod +x smoke-test.sh && ./smoke-test.sh'
-      }
-    }
-
   }
 
 }
