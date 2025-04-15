@@ -61,7 +61,7 @@ pipeline {
     stage("Acceptance test") {
       steps {
         sleep time: 60, unit: 'SECONDS'
-        sh 'cd Chapter08/sample1 && chmod +x acceptance-test.sh && ./acceptance-test.sh'
+        sh 'cd Chapter08/sample1 && chmod +x acceptance-test.sh && JAVA_TOOL_OPTIONS="" ./acceptance-test.sh'
       }
     }
 
