@@ -19,6 +19,7 @@ spec:
       containers:
       - name: calculator
         image: docker.io/branweis/calculator:{{VERSION}}
+        args: ["--server.port=8080", "--server.address=0.0.0.0"]
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
