@@ -41,6 +41,13 @@ pipeline {
       }
     }
 
+    stage('Debug Kubernetes Contexts') {
+      steps {
+        sh 'kubectl config get-contexts'
+        sh 'kubectl config current-context'
+      }
+    }
+
     stage("Deploy to staging") {
       steps {
         sh '''
