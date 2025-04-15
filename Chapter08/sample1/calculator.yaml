@@ -18,7 +18,7 @@ spec:
         - name: regcred
       containers:
       - name: calculator
-        image: brandweis/calculator:{{VERSION}}
+        image: docker.io/branweis/calculator:{{VERSION}}
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
