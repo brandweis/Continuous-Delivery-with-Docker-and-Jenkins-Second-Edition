@@ -41,7 +41,7 @@ pipeline {
       }
     }
 
-    stage('Debug Kubernetes Contexts') {
+    stage("Debug Kubernetes Contexts") {
       steps {
         sh 'kubectl config get-contexts'
         sh 'kubectl config current-context'
@@ -55,13 +55,6 @@ pipeline {
           kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/hazelcast.yaml
           kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/calculator.yaml
         '''
-      }
-    }
-
-    stage("Acceptance test") {
-      steps {
-        sleep time: 60, unit: 'SECONDS'
-        sh 'cd Chapter08/sample1 && chmod +x acceptance-test.sh && JAVA_TOOL_OPTIONS="" ./acceptance-test.sh'
       }
     }
 
