@@ -1,5 +1,4 @@
 pipeline {
-
   agent {
     label 'week11'
   }
@@ -9,6 +8,7 @@ pipeline {
   }
 
   environment {
+    BUILD_TIMESTAMP = "${new Date().format('yyyyMMddHHmmss')}"
     IMAGE_NAME = "brandweis/calculator:${BUILD_TIMESTAMP}"
     LOCAL_IMAGE = "localhost:5000/brandweis/calculator:${BUILD_TIMESTAMP}"
   }
@@ -22,33 +22,24 @@ pipeline {
       }
     }
 
-    stage("Docker build") {
+    stage("Docker build & push") {
       steps {
-        sh 'docker build -t $IMAGE_NAME Chapter08/sample1'
-        sh 'docker tag $IMAGE_NAME $LOCAL_IMAGE'
-      }
-    }
-
-    stage("Docker push") {
-      steps {
-        sh 'docker push $LOCAL_IMAGE'
+        sh '''
+          docker build -t $IMAGE_NAME Chapter08/sample1
+          docker tag $IMAGE_NAME $LOCAL_IMAGE
+          docker push $LOCAL_IMAGE
+          docker push $IMAGE_NAME
+        '''
       }
     }
 
     stage("Update version") {
       steps {
-        sh 'cd Chapter08/sample1 && sed -i "s/{{VERSION}}/${BUILD_TIMESTAMP}/g" calculator.yaml'
+        sh 'cd Chapter08/sample1 && sed -i "s|{{VERSION}}|${BUILD_TIMESTAMP}|g" calculator.yaml'
       }
     }
 
-    stage("Debug Kubernetes Contexts") {
-      steps {
-        sh 'kubectl config get-contexts'
-        sh 'kubectl config current-context'
-      }
-    }
-
-    stage("Deploy to staging") {
+    stage("Deploy to staging (local)") {
       steps {
         sh '''
           kubectl config use-context docker-desktop
@@ -58,7 +49,7 @@ pipeline {
       }
     }
 
-    stage("Release") {
+    stage("Deploy to release (GKE)") {
       steps {
         sh '''
           kubectl config use-context gke_ex11-456820_us-east1_hello-cluster
@@ -67,8 +58,6 @@ pipeline {
         '''
       }
     }
-
   }
-
 }
 

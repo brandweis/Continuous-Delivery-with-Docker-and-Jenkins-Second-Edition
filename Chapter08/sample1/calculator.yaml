@@ -18,7 +18,7 @@ spec:
         - name: regcred
       containers:
       - name: calculator
-        image: localhost:5000/calculator:latest
+        image: brandweis/calculator:{{VERSION}}
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
