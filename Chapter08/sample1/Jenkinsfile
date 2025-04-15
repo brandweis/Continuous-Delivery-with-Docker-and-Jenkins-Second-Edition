@@ -10,7 +10,7 @@ pipeline {
 
   environment {
     IMAGE_VERSION = "${BUILD_TIMESTAMP}"
-    IMAGE_NAME = "brandweis/calculator:${IMAGE_VERSION}"
+    IMAGE_NAME = "branweis/calculator:${IMAGE_VERSION}"
     LOCAL_IMAGE = "localhost:5000/brandweis/calculator:${IMAGE_VERSION}"
   }
 
