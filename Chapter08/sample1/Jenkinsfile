@@ -23,7 +23,7 @@ pipeline {
       }
     }
 
-    stage("Docker build & push") {
+    stage("Docker Build & Push") {
       steps {
         script {
           sh 'docker build -t $IMAGE_NAME Chapter08/sample1'
