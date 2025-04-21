@@ -56,15 +56,15 @@ pipeline {
       }
     }
 
-    stage("Deploy to release (GKE)") {
-      steps {
-        sh '''
-          kubectl config use-context gke_ex11-456820_us-east1_hello-cluster
-          kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/hazelcast.yaml
-          kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/calculator.yaml
-        '''
-      }
-    }
+//    stage("Deploy to release (GKE)") {
+//      steps {
+//        sh '''
+//          kubectl config use-context gke_ex11-456820_us-east1_hello-cluster
+//          kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/hazelcast.yaml
+//          kubectl --insecure-skip-tls-verify apply -f Chapter08/sample1/calculator.yaml
+//        '''
+//      }
+//    }
 
   }
 }
