@@ -1,0 +1,10 @@
+mysql:
+  existingConfigSecret:
+    name: mysql-exporter-cnf
+    key: my.cnf
+
+serviceMonitor:
+  enabled: true
+  additionalLabels:
+    release: kube-prometheus-stack-1745261920
+
