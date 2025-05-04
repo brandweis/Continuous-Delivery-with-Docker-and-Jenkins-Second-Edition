@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mongodb-connection-alert
+  namespace: prometheus
+  labels:
+    release: kube-prometheus-stack-1745261920
+    app: kube-prometheus-stack
+spec:
+  groups:
+    - name: mongodb.rules
+      rules:
+        - alert: MongoDBHighConnections
+          expr: mongodb_ss_connections{conn_type="active"} > 2
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MongoDB has more than 2 active connections"
+            description: "MongoDB has {{ $value }} active connections"
+

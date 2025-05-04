@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-exporter
+  namespace: prometheus
+  labels:
+    app: mongodb-exporter
+spec:
+  selector:
+    app: mongodb-exporter
+  ports:
+    - name: http
+      port: 9216
+      targetPort: 9216
+

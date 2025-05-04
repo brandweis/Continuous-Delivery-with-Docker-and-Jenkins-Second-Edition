@@ -1,0 +1,18 @@
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelector:
+      matchLabels:
+        release: kube-prometheus-stack-1745261920
+    serviceMonitorNamespaceSelector:
+      matchNames:
+        - prometheus
+    ruleNamespaceSelector:
+      matchNames:
+        - prometheus
+    alertmanagerConfigSelector:
+      matchLabels:
+        alertmanagerConfig: example
+    alertmanagerConfigNamespaceSelector:
+      matchNames:
+        - prometheus
+

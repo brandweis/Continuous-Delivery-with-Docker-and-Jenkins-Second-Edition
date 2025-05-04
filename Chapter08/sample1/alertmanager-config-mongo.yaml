@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: slack-mongo
+  labels:
+    alertmanagerConfig: example
+spec:
+  receivers:
+    - name: slack-receiver
+      slackConfigs:
+        - apiURL:
+            key: apiURL
+            name: slack-secret
+            optional: false
+          channel: '#alerts'
+          text: |-
+            *Summary:* MongoDB has more than 2 connections
+            *Description:* MongoDB on node {{ range .Alerts }}{{ .Labels.instance }}{{ end }} has more than 2 connections
+            *Severity:* critical
+  route:
+    groupBy: ['severity']
+    groupWait: 3m
+    groupInterval: 5m
+    repeatInterval: 30m
+    receiver: slack-receiver
+
